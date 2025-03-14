@@ -1,43 +1,76 @@
 import 'package:flutter/material.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ThemeProvider extends ChangeNotifier {
-  ThemeData _currentTheme;
-  final String _themePreferenceKey = 'selected_theme';
+part 'theme_provider.g.dart';
 
-  ThemeProvider() : _currentTheme = defaultTheme;
+// Persistent provider for the shared preferences instance
+@Riverpod(keepAlive: true)
+Future<SharedPreferences> sharedPreferences(SharedPreferencesRef ref) async {
+  return await SharedPreferences.getInstance();
+}
 
-  static final ThemeData defaultTheme = ThemeData(
-    primaryColor: const Color(0xFF4F46E5),
-    scaffoldBackgroundColor: const Color(0xFFF5F5F7),
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF4F46E5),
-      background: const Color(0xFFF5F5F7),
-    ),
-  );
+// Model class to hold theme data - renamed to AppTheme to avoid conflict
+class AppTheme {
+  final Color primaryColor;
 
-  ThemeData get currentTheme => _currentTheme;
+  const AppTheme({required this.primaryColor});
 
-  Future<void> loadSavedTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedColorHex = prefs.getInt(_themePreferenceKey);
-    if (savedColorHex != null) {
-      final color = Color(savedColorHex);
-      updateTheme(color);
-    }
+  // Get a lighter shade of the primary color
+  Color get lightShade => Color.lerp(primaryColor, Colors.white, 0.7)!;
+
+  // Get a darker shade of the primary color
+  Color get darkShade => Color.lerp(primaryColor, Colors.black, 0.2)!;
+
+  // Get the complementary color
+  Color get complementaryColor {
+    final hslColor = HSLColor.fromColor(primaryColor);
+    return HSLColor.fromAHSL(
+      hslColor.alpha,
+      (hslColor.hue + 180) % 360,
+      hslColor.saturation,
+      hslColor.lightness,
+    ).toColor();
   }
 
-  Future<void> updateTheme(Color primaryColor) async {
-    _currentTheme = ThemeData(
-      primaryColor: primaryColor,
-      scaffoldBackgroundColor: const Color(0xFFF5F5F7),
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        background: const Color(0xFFF5F5F7),
-      ),
+  AppTheme copyWith({
+    Color? primaryColor,
+  }) {
+    return AppTheme(
+      primaryColor: primaryColor ?? this.primaryColor,
     );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_themePreferenceKey, primaryColor.value);
-    notifyListeners();
+  }
+}
+
+@Riverpod(keepAlive: true)
+class Theme extends _$Theme {
+  static const String _themeColorKey = 'theme_color';
+
+  @override
+  Future<AppTheme> build() async {
+    return _loadThemeData();
+  }
+
+  Future<AppTheme> _loadThemeData() async {
+    final prefs = await ref.watch(sharedPreferencesProvider.future);
+    final colorValue = prefs.getInt(_themeColorKey);
+
+    return AppTheme(
+      primaryColor:
+          colorValue != null ? Color(colorValue) : const Color(0xFF4F46E5),
+    );
+  }
+
+  Future<void> updateTheme(Color newColor) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      await prefs.setInt(_themeColorKey, newColor.value);
+
+      state = AsyncValue.data(AppTheme(primaryColor: newColor));
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
   }
 }
