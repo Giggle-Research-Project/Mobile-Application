@@ -1,232 +1,518 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:giggle/features/lessons/lessons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:giggle/core/models/user_model.dart';
+import 'package:giggle/core/providers/auth_provider.dart';
+import 'package:giggle/core/widgets/bg_pattern.dart';
+import 'package:giggle/core/widgets/sub_page_header.widget.dart';
+import 'dart:ui';
 
-class PersonalizedCourses extends StatefulWidget {
-  const PersonalizedCourses({Key? key}) : super(key: key);
+import 'package:giggle/features/lessons/lessons.dart';
+import 'package:giggle/features/lessons/question_generate.dart';
+
+class PersonalizedCourses extends ConsumerStatefulWidget {
+  final Map<String, String>? difficultyLevels;
+
+  const PersonalizedCourses({
+    Key? key,
+    required this.difficultyLevels,
+  }) : super(key: key);
 
   @override
   _PersonalizedCoursesState createState() => _PersonalizedCoursesState();
 }
 
-class _PersonalizedCoursesState extends State<PersonalizedCourses> {
+class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  Map<String, List<Map<String, dynamic>>> questionsByOperation = {};
+  bool isLoading = true;
+
+  Map<String, bool> unlockedOperations = {
+    'Addition': true,
+    'Subtraction': false,
+    'Multiplication': false,
+    'Division': false,
+  };
+
+  Map<String, bool> completedOperations = {
+    'Addition': false,
+    'Subtraction': false,
+    'Multiplication': false,
+    'Division': false,
+  };
+
+  final List<Map<String, dynamic>> mathOperations = [
+    {
+      'title': 'Addition',
+      'subtitle': 'Learn to add numbers like a math wizard!',
+      'icon': Icons.add_circle_outline,
+      'color': const Color(0xFF30D158),
+    },
+    {
+      'title': 'Subtraction',
+      'subtitle': 'Subtract with speed and precision',
+      'icon': Icons.remove_circle_outline,
+      'color': const Color(0xFF5E5CE6),
+    },
+    {
+      'title': 'Multiplication',
+      'subtitle': 'Multiply your math superpowers',
+      'icon': Icons.close,
+      'color': const Color(0xFFFF9500),
+    },
+    {
+      'title': 'Division',
+      'subtitle': 'Master the art of fair sharing',
+      'icon': Icons.pie_chart_outline,
+      'color': const Color(0xFFFF3B30),
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    _controller.forward();
+
+    _checkUserProgress();
+  }
+
+  Future<void> _checkUserProgress() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await _checkOperationCompletion('Addition');
+
+      if (completedOperations['Addition'] == true) {
+        unlockedOperations['Subtraction'] = true;
+        await _checkOperationCompletion('Subtraction');
+      }
+
+      if (completedOperations['Subtraction'] == true) {
+        unlockedOperations['Multiplication'] = true;
+        await _checkOperationCompletion('Multiplication');
+      }
+
+      if (completedOperations['Multiplication'] == true) {
+        unlockedOperations['Division'] = true;
+        await _checkOperationCompletion('Division');
+      }
+    } catch (e) {
+      print("Error checking user progress: $e");
+    }
+
+    _preloadQuestions();
+  }
+
+  Future<void> _checkOperationCompletion(String operation) async {
+    final user = ref.read(authProvider).value;
+    if (user == null) return;
+    print(operation);
+
+    try {
+      bool isVerbalComplete = false;
+      bool isSemanticComplete = false;
+      bool isProceduralComplete = false;
+
+      final verbalDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(user.uid)
+          .collection(operation)
+          .doc('Verbal Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      if (verbalDoc.exists && verbalDoc.data() != null) {
+        isVerbalComplete = verbalDoc.data()!['completed'] == true;
+      }
+
+      final semanticDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(user.uid)
+          .collection(operation)
+          .doc('Semantic Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      if (semanticDoc.exists && semanticDoc.data() != null) {
+        isSemanticComplete = semanticDoc.data()!['completed'] == true;
+      }
+
+      final proceduralDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(user.uid)
+          .collection(operation)
+          .doc('Procedural Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      if (proceduralDoc.exists && proceduralDoc.data() != null) {
+        isProceduralComplete = proceduralDoc.data()!['completed'] == true;
+      }
+
+      completedOperations[operation] =
+          isVerbalComplete && isSemanticComplete && isProceduralComplete;
+    } catch (e) {
+      print("Error checking $operation completion: $e");
+    }
+  }
+
+  void _preloadQuestions() async {
+    if (widget.difficultyLevels == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    questionsByOperation.clear();
+
+    for (var operation in mathOperations) {
+      String operationName = operation['title'];
+
+      List<Map<String, dynamic>> questions =
+          generatePersonalizedQuestions(operationName, widget.difficultyLevels);
+
+      questionsByOperation[operationName] = questions;
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // Custom AppBar with Modern Design
-            SliverAppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              expandedHeight: 120,
-              flexibleSpace: FlexibleSpaceBar(
-                title: Text(
-                  'Math Learning Paths',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 24,
-                    shadows: [
-                      Shadow(
-                        blurRadius: 10.0,
-                        color: Colors.black.withOpacity(0.1),
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                ),
-                centerTitle: false,
-                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-              ),
-            ),
+    final authState = ref.watch(authProvider);
 
-            // Main Content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+    return authState.when(
+      data: (AppUser? user) {
+        if (user == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/login');
+          });
+          return const SizedBox.shrink();
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF2F4F8),
+          body: Stack(
+            children: [
+              const BackgroundPattern(),
+              SafeArea(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Playful Intro Text
-                    Text(
-                      'Your Math Adventure Awaits!',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black.withOpacity(0.8),
-                      ),
+                    const SubPageHeader(
+                      title: "Math Courses",
+                      desc: "Master one skill at a time",
                     ),
-                    const SizedBox(height: 16),
+                    if (isLoading)
+                      const Expanded(
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 20),
+                          child: GridView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 20,
+                              crossAxisSpacing: 20,
+                              childAspectRatio: 0.85,
+                            ),
+                            itemCount: mathOperations.length,
+                            itemBuilder: (context, index) {
+                              final operation = mathOperations[index];
+                              final String operationTitle = operation['title'];
+                              final bool isUnlocked =
+                                  unlockedOperations[operationTitle] ?? false;
+                              final bool isCompleted =
+                                  completedOperations[operationTitle] ?? false;
 
-                    // Math Operations Grid
-                    _buildMathOperationsGrid(),
+                              return FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: _buildCourseCard(
+                                  operation,
+                                  isUnlocked: isUnlocked,
+                                  isCompleted: isCompleted,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(child: Text('Error: ${error.toString()}')),
       ),
     );
   }
 
-  Widget _buildMathOperationsGrid() {
-    final mathOperations = [
-      {
-        'title': 'Addition',
-        'subtitle': 'Learn to add numbers like a math wizard!',
-        'icon': Icons.add_circle_outline,
-        'color': const Color(0xFF30D158),
-        'progress': 0.7,
-      },
-      {
-        'title': 'Subtraction',
-        'subtitle': 'Subtract with speed and precision',
-        'icon': Icons.remove_circle_outline,
-        'color': const Color(0xFF5E5CE6),
-        'progress': 0.5,
-      },
-      {
-        'title': 'Multiplication',
-        'subtitle': 'Multiply your math superpowers',
-        'icon': Icons.close,
-        'color': const Color(0xFFFF9500),
-        'progress': 0.3,
-      },
-      {
-        'title': 'Division',
-        'subtitle': 'Master the art of fair sharing',
-        'icon': Icons.pie_chart_outline,
-        'color': const Color(0xFFFF3B30),
-        'progress': 0.2,
-      },
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: mathOperations.length,
-      itemBuilder: (context, index) {
-        final operation = mathOperations[index];
-        return _buildMathOperationCard(
-          title: operation['title'] as String,
-          subtitle: operation['subtitle'] as String,
-          icon: operation['icon'] as IconData,
-          color: operation['color'] as Color,
-          progress: operation['progress'] as double,
-        );
-      },
-    ).animate().fadeIn(duration: 600.ms);
-  }
-
-  Widget _buildMathOperationCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required double progress,
+  Widget _buildCourseCard(
+    Map<String, dynamic> course, {
+    required bool isUnlocked,
+    required bool isCompleted,
   }) {
+    final String title = course['title'];
+    final Color baseColor = course['color'];
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(25),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            // TODO: Navigate to specific math operation screen
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon and Start Learning
-                GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => LessonsScreen(),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(icon, color: color, size: 28),
-                      ),
-                      Text(
-                        'Start',
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
+          borderRadius: BorderRadius.circular(25),
+          onTap: isUnlocked && !isCompleted
+              ? () {
+                  final operationQuestions = questionsByOperation[title] ?? [];
 
-                // Title and Subtitle
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black.withOpacity(0.8),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black.withOpacity(0.6),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
+                  Map<String, List<Map<String, dynamic>>> questionsByType = {};
+                  for (var question in operationQuestions) {
+                    String type = question['dyscalculia_type'];
+                    if (!questionsByType.containsKey(type)) {
+                      questionsByType[type] = [];
+                    }
+                    questionsByType[type]?.add(question);
+                  }
 
-                // Progress Indicator
-                LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: color.withOpacity(0.1),
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(10),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LessonsScreen(
+                        difficultyLevels: widget.difficultyLevels,
+                        courseName: title,
+                        questionsByType: questionsByType,
+                      ),
+                    ),
+                  );
+                }
+              : null,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isUnlocked
+                            ? baseColor.withOpacity(0.1)
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(
+                        course['icon'],
+                        color: isUnlocked ? baseColor : Colors.grey.shade400,
+                        size: 32,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isUnlocked
+                            ? const Color(0xFF1D1D1F)
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      course['subtitle'],
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.3,
+                        color: isUnlocked
+                            ? const Color(0xFF1D1D1F).withOpacity(0.6)
+                            : Colors.grey.shade400,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "${questionsByOperation[title]?.length ?? 0} questions",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isUnlocked
+                            ? Colors.grey.shade600
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          isCompleted
+                              ? 'Completed'
+                              : isUnlocked
+                                  ? 'Start Learning'
+                                  : 'Locked',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isCompleted
+                                ? Colors.green
+                                : isUnlocked
+                                    ? baseColor
+                                    : Colors.grey.shade400,
+                          ),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          isCompleted
+                              ? Icons.check_circle
+                              : isUnlocked
+                                  ? Icons.arrow_forward
+                                  : Icons.lock,
+                          color: isCompleted
+                              ? Colors.green
+                              : isUnlocked
+                                  ? baseColor
+                                  : Colors.grey.shade400,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              if (!isUnlocked)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: Stack(
+                      children: [
+                        // Gradient overlay
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.grey.withOpacity(0.2),
+                                Colors.grey.withOpacity(0.4),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        // Lock icon and text
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 20,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.lock_outline,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Locked",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (isCompleted)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          "Completed",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

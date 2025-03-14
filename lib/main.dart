@@ -1,63 +1,78 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:giggle/core/providers/auth_provider.dart';
 import 'package:giggle/core/providers/theme_provider.dart';
 import 'package:giggle/core/widgets/bottom_navbar.dart';
-import 'package:giggle/features/dashboard/dashboard.dart';
-import 'package:giggle/features/home/home.dart';
-import 'package:giggle/features/monster_guide/monster_guide.dart';
-import 'package:giggle/features/personalized_cources/personalized_cources.dart';
-import 'package:giggle/features/theme_selection/theme_selection_screen.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'features/index.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
-  final themeProvider = ThemeProvider();
-  await themeProvider.loadSavedTheme();
+  try {
+    await dotenv.load(fileName: 'lib/config/.env');
+    print('Dotenv loaded successfully: ${dotenv.env}');
+  } catch (e) {
+    print('Failed to load .env file: $e');
+  }
 
   runApp(
-    ChangeNotifierProvider.value(
-      value: themeProvider,
-      child: const MyApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, _) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeAsync = ref.watch(themeProvider);
+
+    return themeAsync.when(
+      data: (themeData) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          theme: themeProvider.currentTheme,
-          home: FutureBuilder<bool>(
-            future: _checkFirstRun(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final isFirstRun = snapshot.data ?? true;
-              if (isFirstRun) {
-                return const ThemeSelectionScreen(isInitialSelection: true);
-              }
-
-              return const MainScreen();
-            },
+          title: 'Survey Camp',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: themeData.primaryColor,
+            ),
+            useMaterial3: true,
           ),
+          initialRoute: '/splash',
+          home: const AuthWrapper(),
           routes: {
+            '/splash': (context) => const SplashScreen(),
+            '/login': (context) => const LoginPage(),
             '/main': (context) => const MainScreen(),
-            '/home': (context) => const HomeScreen(),
+            '/home': (context) => const AuthWrapper(),
             '/theme': (context) => const ThemeSelectionScreen(),
             '/guide': (context) => const MonsterGuideScreen(),
-            '/lessons': (context) => const PersonalizedCourses(),
             '/dashboard': (context) => const DashboardScreen(),
           },
         );
       },
+      loading: () => MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+      error: (error, stack) => MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text('Error loading theme: $error'),
+          ),
+        ),
+      ),
     );
   }
 
@@ -68,5 +83,29 @@ class MyApp extends StatelessWidget {
       await prefs.setBool('is_first_run', false);
     }
     return isFirstRun;
+  }
+}
+
+class AuthWrapper extends ConsumerWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    return authState.when(
+      data: (user) {
+        if (user == null) {
+          return const LoginPage();
+        }
+        return const MainScreen();
+      },
+      loading: () => const SplashScreen(),
+      error: (error, stack) => Scaffold(
+        body: Center(
+          child: Text('Error: $error'),
+        ),
+      ),
+    );
   }
 }

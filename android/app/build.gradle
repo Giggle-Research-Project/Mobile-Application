@@ -2,6 +2,7 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    id 'com.google.gms.google-services'
 }
 
 def localProperties = new Properties()
@@ -24,7 +25,6 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.example.giggle"
-    // compileSdkVersion flutter.compileSdkVersion
     compileSdkVersion 34
     ndkVersion flutter.ndkVersion
 
@@ -46,7 +46,7 @@ android {
         applicationId "com.example.giggle"
         // You can update the following values to match your application needs.
         // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -65,4 +65,15 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    
+    implementation 'com.google.ar:core:1.33.0'
+
+    
+    implementation 'com.google.ar.sceneform.ux:sceneform-ux:1.15.0'
+
+    
+    implementation 'com.google.ar.sceneform:core:1.15.0'
+}
+

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:giggle/core/models/theme_option.dart';
 import 'package:giggle/core/providers/theme_provider.dart';
-import 'package:provider/provider.dart';
 
-class ThemeSelectionScreen extends StatefulWidget {
+class ThemeSelectionScreen extends ConsumerStatefulWidget {
   final bool isInitialSelection;
 
   const ThemeSelectionScreen({
@@ -12,10 +12,11 @@ class ThemeSelectionScreen extends StatefulWidget {
   });
 
   @override
-  State<ThemeSelectionScreen> createState() => _ThemeSelectionScreenState();
+  ConsumerState<ThemeSelectionScreen> createState() =>
+      _ThemeSelectionScreenState();
 }
 
-class _ThemeSelectionScreenState extends State<ThemeSelectionScreen>
+class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -258,9 +259,12 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen>
     return GestureDetector(
       onTap: () async {
         final selectedTheme = themeOptions[_selectedThemeIndex];
-        await context
-            .read<ThemeProvider>()
+
+        // Using Riverpod instead of Provider
+        await ref
+            .read(themeProvider.notifier)
             .updateTheme(selectedTheme.primaryColor);
+
         if (mounted) {
           if (widget.isInitialSelection) {
             Navigator.pushReplacementNamed(context, '/main');

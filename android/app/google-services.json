@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "516941991696",
+    "firebase_url": "https://giggle-67ef5-default-rtdb.firebaseio.com",
+    "project_id": "giggle-67ef5",
+    "storage_bucket": "giggle-67ef5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:516941991696:android:5fb813bf5487777c589f95",
+        "android_client_info": {
+          "package_name": "com.example.giggle"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "516941991696-adv8k3b3jgio4ibltspsansel289sok4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgjNe1DtfE-A8KCFePKIS7IoK5d3H4X6c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "516941991696-adv8k3b3jgio4ibltspsansel289sok4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,5 @@
+{
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "cmake.sourceDirectory": "D:/SilverlineIT Projects/giggle/linux",
+  "java.compile.nullAnalysis.mode": "automatic"
+}
