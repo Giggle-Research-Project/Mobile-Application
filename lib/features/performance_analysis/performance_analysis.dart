@@ -7,31 +7,21 @@ class PerformanceAnalysisScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Performance Analysis',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-      ),
+      appBar: _buildAppBar(context),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            ///* Performance Metrics Card
             _buildPerformanceMetricsCard(),
             const SizedBox(height: 20),
+
+            ///* Progress Indicators
             _buildProgressIndicators(),
             const SizedBox(height: 20),
+
+            ///* Future Activity Button
             _buildFutureActivityButton(),
             const SizedBox(height: 20),
           ],
@@ -40,6 +30,27 @@ class PerformanceAnalysisScreen extends StatelessWidget {
     );
   }
 
+  /// * AppBar
+  AppBar _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text(
+        'Performance Analysis',
+        style: TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      centerTitle: true,
+    );
+  }
+
+  /// * Performance Metrics Card
   Widget _buildPerformanceMetricsCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -94,6 +105,7 @@ class PerformanceAnalysisScreen extends StatelessWidget {
     );
   }
 
+  /// * Metric Item
   Widget _buildMetricItem({
     required IconData icon,
     required String title,
@@ -134,6 +146,7 @@ class PerformanceAnalysisScreen extends StatelessWidget {
     );
   }
 
+  /// * Progress Indicators
   Widget _buildProgressIndicators() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,6 +181,7 @@ class PerformanceAnalysisScreen extends StatelessWidget {
     );
   }
 
+  /// * Single Progress Indicator
   Widget _buildSingleProgressIndicator({
     required String title,
     required double progress,
@@ -212,6 +226,7 @@ class PerformanceAnalysisScreen extends StatelessWidget {
     );
   }
 
+  /// * Future Activity Button
   Widget _buildFutureActivityButton() {
     return Center(
       child: ElevatedButton(

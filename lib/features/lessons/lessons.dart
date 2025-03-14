@@ -1,227 +1,479 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:giggle/core/widgets/bottom_navbar.dart';
-import 'package:giggle/features/function%2002/semantic_section.dart';
-import 'package:giggle/features/function%2003/procedural_section.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:giggle/core/models/user_model.dart';
+import 'package:giggle/core/providers/auth_provider.dart';
+import 'package:giggle/core/widgets/bg_pattern.dart';
+import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:giggle/features/user_progress/user_progress.dart';
 
-class LessonsScreen extends StatelessWidget {
-  const LessonsScreen({Key? key}) : super(key: key);
+class LessonsScreen extends ConsumerStatefulWidget {
+  final Map<String, String>? difficultyLevels;
+  final String courseName;
+  final Map<String, List<Map<String, dynamic>>>? questionsByType;
+
+  const LessonsScreen({
+    Key? key,
+    required this.difficultyLevels,
+    required this.courseName,
+    this.questionsByType,
+  }) : super(key: key);
+
+  @override
+  _LessonsScreenState createState() => _LessonsScreenState();
+}
+
+class _LessonsScreenState extends ConsumerState<LessonsScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+
+  // Track completion status
+  bool semanticCompleted = false;
+  bool proceduralCompleted = false;
+  bool verbalCompleted = false;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    _controller.forward();
+
+    // Check completion status from Firestore
+    _checkCompletionStatus(widget.courseName);
+  }
+
+  Future<void> _checkCompletionStatus(String operation) async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final authState = ref.read(authProvider);
+      final userId = authState.value?.uid;
+
+      if (userId == null) {
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      // Check Semantic completion
+      final semanticDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(userId)
+          .collection(operation)
+          .doc('Semantic Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      // Check Procedural completion
+      final proceduralDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(userId)
+          .collection(operation)
+          .doc('Procedural Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      // Check Verbal completion
+      final verbalDoc = await FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(userId)
+          .collection(operation)
+          .doc('Verbal Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
+          .get();
+
+      setState(() {
+        semanticCompleted =
+            semanticDoc.exists && semanticDoc.data()?['completed'] == true;
+        proceduralCompleted =
+            proceduralDoc.exists && proceduralDoc.data()?['completed'] == true;
+        verbalCompleted =
+            verbalDoc.exists && verbalDoc.data()?['completed'] == true;
+        isLoading = false;
+      });
+    } catch (error) {
+      print('Error checking completion status: $error');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            _buildSliverAppBar(context),
-            _buildMainContent(context),
-          ],
-        ),
-      ),
-    );
-  }
+    final authState = ref.watch(authProvider);
 
-  Widget _buildSliverAppBar(BuildContext context) {
-    return SliverAppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      leading: IconButton(
-        icon: Icon(
-          Icons.arrow_back_ios_new,
-          color: Colors.black.withOpacity(0.8),
-          size: 24,
-        ),
-        onPressed: () => Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => MainScreen(),
-          ),
-        ),
-      ),
-      expandedHeight: 120,
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          'Dyscalculia Lessons',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w700,
-            fontSize: 24,
-            shadows: [
-              Shadow(
-                blurRadius: 10.0,
-                color: Colors.black.withOpacity(0.1),
-                offset: const Offset(0, 4),
-              )
-            ],
-          ),
-        ),
-        centerTitle: false,
-        titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-      ),
-    );
-  }
+    return authState.when(
+      data: (AppUser? user) {
+        if (user == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/login');
+          });
+          return const SizedBox.shrink();
+        }
 
-  Widget _buildMainContent(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Choose Your Learning Path',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.black.withOpacity(0.8),
-              ),
+        return WillPopScope(
+          onWillPop: () async {
+            Navigator.of(context).pop();
+            return false;
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF2F4F8),
+            body: Stack(
+              children: [
+                const BackgroundPattern(),
+                isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : CustomScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        slivers: [
+                          _buildSliverAppBar(context),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 20),
+                                    _buildLearningPaths(),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _buildDyscalculiaLearningPaths(context),
-          ],
-        ),
+          ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(child: Text('Error: ${error.toString()}')),
       ),
     );
   }
 
-  Widget _buildDyscalculiaLearningPaths(BuildContext context) {
-    final learningPaths = [
+  Widget _buildLearningPaths() {
+    final paths = [
       {
         'title': 'Semantic Dyscalculia',
         'description':
             'Understand the true meaning of numbers and mathematical concepts through visual and conceptual learning.',
+        'icon': Icons.psychology,
         'color': const Color(0xFF30D158),
-        'illustration': 'assets/images/semantic_dyscalculia_icon.png',
-        'screen': const CameraLessonScreen(),
+        'type': 'Semantic Dyscalculia',
+        'isLocked': false,
+        'isCompleted': semanticCompleted,
       },
       {
         'title': 'Procedural Dyscalculia',
         'description':
             'Learn step-by-step problem-solving techniques and mathematical procedures with guided support.',
+        'icon': Icons.account_tree,
         'color': const Color(0xFF5E5CE6),
-        'illustration': 'assets/images/procedural_dyscalculia_icon.png',
-        'screen': const VideoLessonScreen(
-          videoUrl: 'assets/videos/procedural_dyscalculia.mp4',
-        ),
+        'type': 'Procedural Dyscalculia',
+        'isLocked': semanticCompleted ? false : true,
+        'isCompleted': proceduralCompleted,
       },
       {
         'title': 'Verbal Dyscalculia',
         'description':
             'Improve mathematical language comprehension and communication skills through interactive lessons.',
-        'color': const Color(0xFFFF9500),
-        'illustration': 'assets/images/verbal_dyscalculia_icon.png',
-        'screen': const VideoLessonScreen(
-          videoUrl: '',
-        ),
+        'icon': Icons.record_voice_over,
+        'color': const Color(0xFFFF9F0A),
+        'type': 'Verbal Dyscalculia',
+        'isLocked': proceduralCompleted ? false : true,
+        'isCompleted': verbalCompleted,
       },
     ];
 
     return Column(
-      children: learningPaths.map((path) {
-        return _buildLearningPathCard(
-          context,
-          title: path['title'] as String,
-          description: path['description'] as String,
-          color: path['color'] as Color,
-          illustration: path['illustration'] as String,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => path['screen'] as Widget,
-            ),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Choose Your Learning Path',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1D1D1F),
           ),
-        );
-      }).toList(),
-    ).animate().fadeIn(duration: 600.ms);
+        ),
+        const SizedBox(height: 15),
+        ...paths.map((path) {
+          // Get questions for this dyscalculia type
+          final typeQuestions = widget.questionsByType?[path['type']] ?? [];
+
+          return _buildPathCard(
+            path,
+            questionCount: typeQuestions.length,
+          );
+        }).toList(),
+      ],
+    );
   }
 
-  Widget _buildLearningPathCard(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required Color color,
-    required String illustration,
-    required VoidCallback onTap,
+  Widget _buildPathCard(
+    Map<String, dynamic> path, {
+    int questionCount = 0,
   }) {
+    final bool isLocked = path['isLocked'] as bool;
+    final bool isCompleted = path['isCompleted'] as bool;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLocked ? Colors.white.withOpacity(0.6) : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          onTap: isLocked
+              ? () {
+                  // Show locked message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Complete the previous path to unlock ${path['title']}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.black87,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  );
+                }
+              : () {
+                  final String dyscalculiaType = path['type'] as String;
+                  final String dataKey =
+                      dyscalculiaType.split(' ')[0].toUpperCase();
+
+                  final List<Map<String, dynamic>> typeQuestions = widget
+                          .questionsByType?[dataKey]
+                          ?.cast<Map<String, dynamic>>() ??
+                      [];
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProgressScreen(
+                        difficultyLevels: widget.difficultyLevels,
+                        courseName: widget.courseName,
+                        dyscalculiaType: path['type'] as String,
+                        questions: typeQuestions,
+                      ),
+                    ),
+                  );
+                },
           borderRadius: BorderRadius.circular(20),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                _buildIllustrationContainer(color, illustration),
-                const SizedBox(width: 20),
-                _buildCardContent(title, description),
-              ],
-            ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: path['color'].withOpacity(isLocked ? 0.05 : 0.1),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(
+                        path['icon'],
+                        color: isLocked
+                            ? path['color'].withOpacity(0.5)
+                            : path['color'],
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            path['title'],
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isLocked
+                                  ? const Color(0xFF1D1D1F).withOpacity(0.5)
+                                  : const Color(0xFF1D1D1F),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            path['description'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.4,
+                              color: isLocked
+                                  ? const Color(0xFF1D1D1F).withOpacity(0.3)
+                                  : const Color(0xFF1D1D1F).withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      isLocked ? Icons.lock : Icons.arrow_forward_ios,
+                      color: isLocked
+                          ? const Color(0xFF1D1D1F).withOpacity(0.2)
+                          : const Color(0xFF1D1D1F).withOpacity(0.3),
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+              if (isCompleted)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.green,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          'Completed',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildIllustrationContainer(Color color, String illustration) {
-    return Container(
-      width: 80,
-      height: 80,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Center(
-        child: Image.asset(
-          illustration,
-          width: 50,
-          height: 50,
-          color: color,
+  SliverAppBar _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 120,
+      floating: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        background: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 0),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Container(
+                          height: 45,
+                          width: 45,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            color: Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.courseName} Lessons',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1D1D1F),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Complete each path in sequence',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1D1D1F),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCardContent(String title, String description) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Colors.black.withOpacity(0.8),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black.withOpacity(0.5),
-              height: 1.4,
-            ),
-          ),
-        ],
       ),
     );
   }
