@@ -1,0 +1,326 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
+import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
+import 'package:ar_flutter_plugin/datatypes/node_types.dart';
+import 'package:ar_flutter_plugin/datatypes/hittest_result_types.dart';
+import 'package:ar_flutter_plugin/managers/ar_anchor_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_location_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin/models/ar_anchor.dart';
+import 'package:ar_flutter_plugin/models/ar_hittest_result.dart';
+import 'package:ar_flutter_plugin/models/ar_node.dart';
+import 'package:vector_math/vector_math_64.dart' as vectorMath;
+
+class TouchedNode {
+  final int number;
+  final int order;
+  final String nodeName;
+
+  TouchedNode({
+    required this.number,
+    required this.order,
+    required this.nodeName,
+  });
+}
+
+class ARMathGameInteractive extends StatefulWidget {
+  const ARMathGameInteractive({Key? key}) : super(key: key);
+
+  @override
+  _ARMathGameInteractiveState createState() => _ARMathGameInteractiveState();
+}
+
+class _ARMathGameInteractiveState extends State<ARMathGameInteractive> {
+  late ARSessionManager arSessionManager;
+  late ARObjectManager arObjectManager;
+  late ARAnchorManager arAnchorManager;
+
+  List<int> numbers = List.generate(10, (index) => index);
+  List<ARNode> numberNodes = [];
+  List<ARNode> markerNodes = [];
+  List<TouchedNode> touchedNodes = []; // Track touched nodes in order
+
+  bool isInitialized = false;
+  bool isLoading = false;
+  String? errorMessage;
+
+  @override
+  void dispose() {
+    arSessionManager.dispose();
+    super.dispose();
+  }
+
+  // Class to track touched nodes with their order
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('AR Math Game'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _resetGame,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          ARView(
+            onARViewCreated: onARViewCreated,
+            planeDetectionConfig: PlaneDetectionConfig.horizontalAndVertical,
+          ),
+          if (errorMessage != null) _buildErrorWidget(),
+          if (isLoading) _buildLoadingWidget(),
+          _buildTouchedNodesPanel(),
+          _buildInstructionOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTouchedNodesPanel() {
+    if (touchedNodes.isEmpty) return Container();
+
+    return Positioned(
+      top: 80,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text(
+              'Touched Numbers (In Order):',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            ...touchedNodes.map((node) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '${node.order}. Number ${node.number}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Positioned(
+      top: 100,
+      left: 20,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                errorMessage!,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => setState(() => errorMessage = null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Container(
+      color: Colors.black54,
+      child: const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+
+  Widget _buildInstructionOverlay() {
+    return Positioned(
+      top: 20,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        color: Colors.black54,
+        child: const Text(
+          'Tap on the numbers to mark them',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  void onARViewCreated(
+    ARSessionManager arSessionManager,
+    ARObjectManager arObjectManager,
+    ARAnchorManager arAnchorManager,
+    ARLocationManager arLocationManager,
+  ) {
+    this.arSessionManager = arSessionManager;
+    this.arObjectManager = arObjectManager;
+    this.arAnchorManager = arAnchorManager;
+
+    this.arSessionManager.onInitialize(
+          showFeaturePoints: false,
+          showPlanes: true,
+          showWorldOrigin: false,
+          handleTaps: true,
+          handlePans: false, // Disabled panning
+          handleRotation: false, // Disabled rotation
+        );
+
+    this.arObjectManager.onInitialize();
+    this.arObjectManager.onNodeTap = onNodeTapped; // Enable node tap detection
+    this.arSessionManager.onPlaneOrPointTap = _handleTap;
+
+    setState(() {
+      isInitialized = true;
+    });
+
+    _setupInitialNumbers();
+  }
+
+  void onNodeTapped(List<String> nodeNames) {
+    if (nodeNames.isEmpty) return;
+
+    String tappedNodeName = nodeNames.first;
+
+    // Find the tapped number node
+    int nodeIndex =
+        numberNodes.indexWhere((node) => node.name == tappedNodeName);
+    if (nodeIndex != -1 &&
+        !touchedNodes.any((tn) => tn.nodeName == tappedNodeName)) {
+      setState(() {
+        touchedNodes.add(TouchedNode(
+          number: numbers[nodeIndex],
+          order: touchedNodes.length + 1,
+          nodeName: tappedNodeName,
+        ));
+      });
+      _addOrderMarker(nodeIndex);
+    }
+  }
+
+  Future<void> _setupInitialNumbers() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      double radius = 1.0;
+      for (int i = 0; i < numbers.length; i++) {
+        double angle = (i / numbers.length) * 2 * pi;
+        vectorMath.Vector3 position = vectorMath.Vector3(
+          radius * cos(angle),
+          0,
+          radius * sin(angle),
+        );
+
+        ARNode node = ARNode(
+          type: NodeType.webGLB,
+          uri:
+              "file:///android_asset/flutter_assets/assets/3d_models/numbers/number_${numbers[i]}.glb",
+          position: position,
+          scale: vectorMath.Vector3.all(0.2),
+        );
+
+        bool? didAddNode = await arObjectManager.addNode(node);
+        if (didAddNode == true) {
+          numberNodes.add(node);
+        } else {
+          throw Exception('Failed to add number node ${numbers[i]}');
+        }
+      }
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error setting up numbers: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _addOrderMarker(int index) async {
+    vectorMath.Vector3 position = numberNodes[index].position.clone();
+    position.y += 0.2; // Place marker above the number
+
+    // Create text node showing the order number
+    ARNode markerNode = ARNode(
+      type: NodeType.webGLB,
+      uri: "file:///android_asset/flutter_assets/assets/3d_models/marker.glb",
+      position: position,
+      scale: vectorMath.Vector3.all(0.1),
+    );
+
+    bool? didAddMarker = await arObjectManager.addNode(markerNode);
+    if (didAddMarker == true) {
+      markerNodes.add(markerNode);
+      // Highlight the selected number
+      numberNodes[index].scale = vectorMath.Vector3.all(0.3);
+    }
+  }
+
+  void _handleTap(List<ARHitTestResult> hitTestResults) {
+    // Keep this method for plane detection, but we're using onNodeTap for node selection
+    return;
+  }
+
+  Future<void> _resetGame() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Remove all nodes
+      for (var node in [...numberNodes, ...markerNodes]) {
+        await arObjectManager.removeNode(node);
+      }
+
+      // Clear all lists
+      setState(() {
+        numberNodes.clear();
+        markerNodes.clear();
+        touchedNodes.clear();
+      });
+
+      // Setup new game
+      await _setupInitialNumbers();
+    } catch (e) {
+      setState(() {
+        errorMessage = 'Error resetting game: ${e.toString()}';
+      });
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+}
