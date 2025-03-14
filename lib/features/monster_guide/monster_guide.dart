@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:giggle/core/constants/monster_guide_constants.dart';
+import 'package:giggle/core/widgets/header.dart';
+import 'package:giggle/features/monster_guide/widgets/feature_content.dart';
 
 class MonsterGuideScreen extends StatefulWidget {
   const MonsterGuideScreen({super.key});
@@ -13,61 +16,6 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
   late final AnimationController _bounceController;
   late final Animation<double> _bounceAnimation;
   int _currentFeatureIndex = 0;
-
-  final List<FeatureGuide> features = [
-    FeatureGuide(
-      title: 'Track Your Progress',
-      description:
-          'Watch your learning journey with fun progress bars and achievements! The more you learn, the higher your level goes! 🚀',
-      emoji: '📊',
-      color: const Color(0xFF4F46E5),
-      tips: [
-        'Check your daily progress',
-        'Complete activities to level up',
-        'Earn special badges',
-        'View your learning statistics',
-      ],
-    ),
-    FeatureGuide(
-      title: 'Learn With Games',
-      description:
-          'Play exciting educational games that make learning super fun! Challenge yourself and earn rewards along the way! 🎮',
-      emoji: '🎲',
-      color: const Color(0xFF059669),
-      tips: [
-        'Choose from different subjects',
-        'Compete with friends',
-        'Unlock new game modes',
-        'Collect special power-ups',
-      ],
-    ),
-    FeatureGuide(
-      title: 'Get Rewards',
-      description:
-          'Earn awesome rewards for your hard work! Collect stars, badges, and unlock special features as you progress! ⭐',
-      emoji: '🏆',
-      color: const Color(0xFFEA580C),
-      tips: [
-        'Complete daily challenges',
-        'Earn bonus points',
-        'Unlock special characters',
-        'Share achievements with friends',
-      ],
-    ),
-    FeatureGuide(
-      title: 'Ask For Help',
-      description:
-          'Need help? I\'m here to assist you! Tap the monster buddy icon anytime to get help with your learning journey! 🤝',
-      emoji: '👾',
-      color: const Color(0xFF7C3AED),
-      tips: [
-        'Get instant help',
-        'Find learning resources',
-        'Get homework tips',
-        'Access video tutorials',
-      ],
-    ),
-  ];
 
   @override
   void initState() {
@@ -124,11 +72,18 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: features.map((feature) {
-                  return _buildFeatureContent(feature);
+                  return FeatureContent(
+                    feature: feature,
+                    bounceAnimation: _bounceAnimation,
+                  );
                 }).toList(),
               ),
             ),
-            _buildNavigation(),
+            Navigation(
+              currentFeatureIndex: _currentFeatureIndex,
+              tabController: _tabController,
+              features: features,
+            ),
           ],
         ),
       ),
@@ -136,175 +91,19 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
   }
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              height: 45,
-              width: 45,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.arrow_back,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Monster Guide',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A1A),
-                ),
-              ),
-              Text(
-                'Learn how to use the app',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return const Header(
+        title: "Monster Guide", desc: "Learn how to use the app");
   }
+}
 
-  Widget _buildFeatureContent(FeatureGuide feature) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildFeatureCard(feature),
-            const SizedBox(height: 30),
-            _buildTipsCard(feature),
-          ],
-        ),
-      ),
-    );
-  }
+class TipItem extends StatelessWidget {
+  final String tip;
+  final Color color;
 
-  Widget _buildFeatureCard(FeatureGuide feature) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            feature.color,
-            feature.color.withOpacity(0.8),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: feature.color.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          AnimatedBuilder(
-            animation: _bounceAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _bounceAnimation.value,
-                child: Container(
-                  height: 120,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Center(
-                    child: Text(
-                      feature.emoji,
-                      style: const TextStyle(fontSize: 60),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-          Text(
-            feature.title,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            feature.description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.9),
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const TipItem({required this.tip, required this.color, super.key});
 
-  Widget _buildTipsCard(FeatureGuide feature) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Quick Tips',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(height: 15),
-          ...feature.tips.map((tip) => _buildTipItem(tip, feature.color)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTipItem(String tip, Color color) {
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
@@ -336,8 +135,22 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
       ),
     );
   }
+}
 
-  Widget _buildNavigation() {
+class Navigation extends StatelessWidget {
+  final int currentFeatureIndex;
+  final TabController tabController;
+  final List<FeatureGuide> features;
+
+  const Navigation({
+    required this.currentFeatureIndex,
+    required this.tabController,
+    required this.features,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -353,12 +166,12 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (_currentFeatureIndex > 0)
-            _buildNavigationButton(
-              'Previous',
-              Icons.arrow_back_rounded,
-              () {
-                _tabController.animateTo(_currentFeatureIndex - 1);
+          if (currentFeatureIndex > 0)
+            NavigationButton(
+              label: 'Previous',
+              icon: Icons.arrow_back_rounded,
+              onTap: () {
+                tabController.animateTo(currentFeatureIndex - 1);
               },
             )
           else
@@ -366,38 +179,57 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
           Row(
             children: List.generate(
               features.length,
-              (index) => _buildPageIndicator(index),
+              (index) => PageIndicator(
+                index: index,
+                currentFeatureIndex: currentFeatureIndex,
+                color: features[currentFeatureIndex].color,
+              ),
             ),
           ),
-          if (_currentFeatureIndex < features.length - 1)
-            _buildNavigationButton(
-              'Next',
-              Icons.arrow_forward_rounded,
-              () {
-                _tabController.animateTo(_currentFeatureIndex + 1);
+          if (currentFeatureIndex < features.length - 1)
+            NavigationButton(
+              label: 'Next',
+              icon: Icons.arrow_forward_rounded,
+              onTap: () {
+                tabController.animateTo(currentFeatureIndex + 1);
               },
               isNext: true,
+              color: features[currentFeatureIndex].color,
             )
           else
-            _buildNavigationButton(
-              'Done',
-              Icons.check_rounded,
-              () {
+            NavigationButton(
+              label: 'Done',
+              icon: Icons.check_rounded,
+              onTap: () {
                 Navigator.pop(context);
               },
               isNext: true,
+              color: features[currentFeatureIndex].color,
             ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildNavigationButton(
-    String label,
-    IconData icon,
-    VoidCallback onTap, {
-    bool isNext = false,
-  }) {
+class NavigationButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isNext;
+  final Color? color;
+
+  const NavigationButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.isNext = false,
+    this.color,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -406,7 +238,7 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
           vertical: 12,
         ),
         decoration: BoxDecoration(
-          color: isNext ? features[_currentFeatureIndex].color : Colors.white,
+          color: isNext ? color : Colors.white,
           borderRadius: BorderRadius.circular(15),
           border: isNext
               ? null
@@ -417,8 +249,7 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
           boxShadow: isNext
               ? [
                   BoxShadow(
-                    color:
-                        features[_currentFeatureIndex].color.withOpacity(0.3),
+                    color: color!.withOpacity(0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 8),
                   ),
@@ -444,17 +275,29 @@ class _MonsterGuideScreenState extends State<MonsterGuideScreen>
       ),
     );
   }
+}
 
-  Widget _buildPageIndicator(int index) {
+class PageIndicator extends StatelessWidget {
+  final int index;
+  final int currentFeatureIndex;
+  final Color color;
+
+  const PageIndicator({
+    required this.index,
+    required this.currentFeatureIndex,
+    required this.color,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: 8,
       height: 8,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: index == _currentFeatureIndex
-            ? features[_currentFeatureIndex].color
-            : const Color(0xFFE5E7EB),
+        color: index == currentFeatureIndex ? color : const Color(0xFFE5E7EB),
       ),
     );
   }
