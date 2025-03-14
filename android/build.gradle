@@ -15,6 +15,11 @@ allprojects {
         google()
         mavenCentral()
     }
+    configurations.all {
+        resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib:1.7.10" 
+        resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.7.10"
+        resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.10"
+    }
 }
 
 rootProject.buildDir = '../build'
