@@ -1,16 +1,12 @@
 import 'dart:io';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 Future<String?> predictHandwriting(
     File imageFile, String squareIdentifier) async {
   try {
-    final mlIP = dotenv.env['MLIP']?.isEmpty ?? true
-        ? dotenv.env['DEFAULT_MLIP']
-        : dotenv.env['MLIP'];
-
-    final uri = Uri.parse('http://$mlIP:8000/predict-handwriting/');
+    final uri = Uri.parse(ApiEndpoints.predictHandwriting);
     var request = http.MultipartRequest('POST', uri);
 
     var fileStream = http.ByteStream(imageFile.openRead());
