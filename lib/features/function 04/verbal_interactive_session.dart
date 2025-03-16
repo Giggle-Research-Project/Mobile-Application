@@ -4,9 +4,9 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:giggle/features/lessons/question_generate.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -106,8 +106,7 @@ class _VerbalInteractiveSessionScreenState
 
   Future<String> sendAudioToML(File audioFile,
       Function(String message, bool isError) showSnackBar) async {
-    final String mlIP = dotenv.env['MLIP'] ?? '127.0.0.1';
-    final url = Uri.parse('http://$mlIP:8000/transcribe');
+    final url = Uri.parse(ApiEndpoints.transcribe);
 
     if (!audioFile.existsSync()) {
       return 'Error: Audio file does not exist';
