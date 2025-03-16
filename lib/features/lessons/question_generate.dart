@@ -1,4 +1,3 @@
-// Function to generate questions based on operation and difficulty levels
 import 'dart:math';
 
 List<Map<String, dynamic>> generatePersonalizedQuestions(
@@ -35,7 +34,7 @@ List<Map<String, dynamic>> _generateProceduralQuestions(
     String operation, String difficulty) {
   final List<Map<String, dynamic>> questions = [];
 
-  // Generate 3 questions for the specified operation and difficulty
+  // Generate 1 question for the specified operation and difficulty
   for (int i = 0; i < 1; i++) {
     Map<String, dynamic> question = {};
 
@@ -67,7 +66,7 @@ List<Map<String, dynamic>> _generateSemanticQuestions(
     String operation, String difficulty) {
   final List<Map<String, dynamic>> questions = [];
 
-  // Generate 2 questions for the specified operation and difficulty
+  // Generate 1 question for the specified operation and difficulty
   for (int i = 0; i < 1; i++) {
     Map<String, dynamic> question = {};
 
@@ -169,12 +168,17 @@ List<String> _generateOptions(dynamic correctAnswer, String difficulty) {
   // Generate options around the correct answer
   Set<int> optionSet = {correctInt};
   while (optionSet.length < 4) {
-    // For small numbers, avoid negative numbers
     if (correctInt < 10) {
       optionSet.add(correctInt + random.nextInt(range * 2) - range + 1);
     } else {
       optionSet.add(correctInt + random.nextInt(range * 4) - range * 2);
     }
+    optionSet.removeWhere((e) => e < 0);
+  }
+
+  // If we couldn't get 4 options, add more until we do
+  while (optionSet.length < 4) {
+    optionSet.add(correctInt + random.nextInt(10) + 1);
   }
 
   return optionSet.map((e) => e.toString()).toList()..shuffle();
@@ -188,22 +192,23 @@ Map<String, dynamic> _generateAdditionQuestion(String difficulty, String type) {
   dynamic correctAnswer;
   List<String> options;
 
+  // Always use single-digit numbers (1-9)
   switch (difficulty) {
     case 'EASY':
-      num1 = random.nextInt(10) + 1; // 1-10
-      num2 = random.nextInt(10) + 1; // 1-10
+      num1 = random.nextInt(5) + 1; // 1-5
+      num2 = random.nextInt(5) + 1; // 1-5
       break;
     case 'MEDIUM':
-      num1 = random.nextInt(30) + 10; // 10-39
-      num2 = random.nextInt(30) + 10; // 10-39
+      num1 = random.nextInt(5) + 5; // 5-9
+      num2 = random.nextInt(5) + 1; // 1-5
       break;
     case 'HARD':
-      num1 = random.nextInt(400) + 100; // 100-499
-      num2 = random.nextInt(400) + 100; // 100-499
+      num1 = random.nextInt(4) + 6; // 6-9
+      num2 = random.nextInt(4) + 6; // 6-9
       break;
     default:
-      num1 = 1;
-      num2 = 1;
+      num1 = random.nextInt(9) + 1; // 1-9
+      num2 = random.nextInt(9) + 1; // 1-9
   }
 
   correctAnswer = num1 + num2;
@@ -222,30 +227,23 @@ Map<String, dynamic> _generateAdditionQuestion(String difficulty, String type) {
       question = contexts[random.nextInt(contexts.length)];
       break;
     case 'VERBAL':
+      final Map<int, String> numberWords = {
+        1: 'one',
+        2: 'two',
+        3: 'three',
+        4: 'four',
+        5: 'five',
+        6: 'six',
+        7: 'seven',
+        8: 'eight',
+        9: 'nine'
+      };
+
       if (difficulty == 'EASY') {
-        final Map<int, String> numberWords = {
-          1: 'one',
-          2: 'two',
-          3: 'three',
-          4: 'four',
-          5: 'five',
-          6: 'six',
-          7: 'seven',
-          8: 'eight',
-          9: 'nine',
-          10: 'ten'
-        };
-        if (numberWords.containsKey(num1) && numberWords.containsKey(num2)) {
-          question = 'What is ${numberWords[num1]} plus ${numberWords[num2]}?';
-        } else {
-          // Fallback for numbers not in the map
-          question = 'What is $num1 plus $num2?';
-        }
+        question = 'What is ${numberWords[num1]} plus ${numberWords[num2]}?';
       } else if (difficulty == 'MEDIUM') {
-        // For medium difficulty, use "plus" instead of "+"
         question = 'What is $num1 plus $num2?';
       } else {
-        // For hard difficulty, use "sum"
         question = 'What is the sum of $num1 and $num2?';
       }
       break;
@@ -276,22 +274,23 @@ Map<String, dynamic> _generateSubtractionQuestion(
   dynamic correctAnswer;
   List<String> options;
 
+  // Ensure single-digit numbers but guarantee num1 >= num2
   switch (difficulty) {
     case 'EASY':
-      num1 = random.nextInt(10) + 5; // 5-14
-      num2 = random.nextInt(num1); // 0 to num1-1
+      num1 = random.nextInt(5) + 5; // 5-9
+      num2 = random.nextInt(5) + 1; // 1-5 (smaller than num1)
       break;
     case 'MEDIUM':
-      num1 = random.nextInt(50) + 20; // 20-69
-      num2 = random.nextInt(20) + 1; // 1-20
+      num1 = random.nextInt(4) + 6; // 6-9
+      num2 = random.nextInt(4) + 2; // 2-5
       break;
     case 'HARD':
-      num1 = random.nextInt(500) + 200; // 200-699
-      num2 = random.nextInt(200) + 50; // 50-249
+      num1 = random.nextInt(3) + 7; // 7-9
+      num2 = random.nextInt(5) + 2; // 2-6
       break;
     default:
-      num1 = 5;
-      num2 = 2;
+      num1 = random.nextInt(5) + 5; // 5-9
+      num2 = random.nextInt(5) + 1; // 1-5
   }
 
   correctAnswer = num1 - num2;
@@ -304,36 +303,29 @@ Map<String, dynamic> _generateSubtractionQuestion(
       final List<String> contexts = [
         'If you have $num1 apples and give $num2 to a friend, how many do you have left?',
         'If there are $num1 apples on a tree and $num2 fall off, how many are left?',
-        'If you have $num1 apples and eat $num2, how much apples do you have left?',
+        'If you have $num1 apples and eat $num2, how many apples do you have left?',
         'If a store has $num1 apples and $num2 are taken away, how many apples remain?'
       ];
       question = contexts[random.nextInt(contexts.length)];
       break;
     case 'VERBAL':
+      final Map<int, String> numberWords = {
+        1: 'one',
+        2: 'two',
+        3: 'three',
+        4: 'four',
+        5: 'five',
+        6: 'six',
+        7: 'seven',
+        8: 'eight',
+        9: 'nine'
+      };
+
       if (difficulty == 'EASY') {
-        final Map<int, String> numberWords = {
-          1: 'one',
-          2: 'two',
-          3: 'three',
-          4: 'four',
-          5: 'five',
-          6: 'six',
-          7: 'seven',
-          8: 'eight',
-          9: 'nine',
-          10: 'ten'
-        };
-        if (numberWords.containsKey(num1) && numberWords.containsKey(num2)) {
-          question = 'What is ${numberWords[num1]} minus ${numberWords[num2]}?';
-        } else {
-          // Fallback for numbers not in the map
-          question = 'What is $num1 minus $num2?';
-        }
+        question = 'What is ${numberWords[num1]} minus ${numberWords[num2]}?';
       } else if (difficulty == 'MEDIUM') {
-        // For medium difficulty, use "minus" instead of "-"
         question = 'What is $num1 minus $num2?';
       } else {
-        // For hard difficulty, use "difference"
         question = 'What is the difference between $num1 and $num2?';
       }
       break;
@@ -364,22 +356,23 @@ Map<String, dynamic> _generateMultiplicationQuestion(
   dynamic correctAnswer;
   List<String> options;
 
+  // Ensure single-digit numbers
   switch (difficulty) {
     case 'EASY':
-      num1 = random.nextInt(5) + 1; // 1-5
-      num2 = random.nextInt(5) + 1; // 1-5
+      num1 = random.nextInt(3) + 1; // 1-3
+      num2 = random.nextInt(3) + 1; // 1-3
       break;
     case 'MEDIUM':
-      num1 = random.nextInt(7) + 3; // 3-9
-      num2 = random.nextInt(7) + 3; // 3-9
+      num1 = random.nextInt(3) + 3; // 3-5
+      num2 = random.nextInt(3) + 2; // 2-4
       break;
     case 'HARD':
-      num1 = random.nextInt(15) + 10; // 10-24
-      num2 = random.nextInt(10) + 5; // 5-14
+      num1 = random.nextInt(4) + 6; // 6-9
+      num2 = random.nextInt(3) + 3; // 3-5
       break;
     default:
-      num1 = 2;
-      num2 = 3;
+      num1 = random.nextInt(5) + 1; // 1-5
+      num2 = random.nextInt(5) + 1; // 1-5
   }
 
   correctAnswer = num1 * num2;
@@ -398,30 +391,23 @@ Map<String, dynamic> _generateMultiplicationQuestion(
       question = contexts[random.nextInt(contexts.length)];
       break;
     case 'VERBAL':
+      final Map<int, String> numberWords = {
+        1: 'one',
+        2: 'two',
+        3: 'three',
+        4: 'four',
+        5: 'five',
+        6: 'six',
+        7: 'seven',
+        8: 'eight',
+        9: 'nine'
+      };
+
       if (difficulty == 'EASY') {
-        final Map<int, String> numberWords = {
-          1: 'one',
-          2: 'two',
-          3: 'three',
-          4: 'four',
-          5: 'five',
-          6: 'six',
-          7: 'seven',
-          8: 'eight',
-          9: 'nine',
-          10: 'ten'
-        };
-        if (numberWords.containsKey(num1) && numberWords.containsKey(num2)) {
-          question = 'What is ${numberWords[num1]} times ${numberWords[num2]}?';
-        } else {
-          // Fallback for numbers not in the map
-          question = 'What is $num1 times $num2?';
-        }
+        question = 'What is ${numberWords[num1]} times ${numberWords[num2]}?';
       } else if (difficulty == 'MEDIUM') {
-        // For medium difficulty, use "times" instead of "×"
         question = 'What is $num1 times $num2?';
       } else {
-        // For hard difficulty, use "product"
         question = 'What is the product of $num1 and $num2?';
       }
       break;
@@ -451,27 +437,28 @@ Map<String, dynamic> _generateDivisionQuestion(String difficulty, String type) {
   dynamic correctAnswer;
   List<String> options;
 
-  // We'll generate the result first, then multiply to get num1
+  // We'll generate the result first (as a single digit), then multiply to get num1
   // This ensures clean division without remainders
   switch (difficulty) {
     case 'EASY':
-      result = random.nextInt(5) + 1; // 1-5
-      num2 = random.nextInt(4) + 2; // 2-5
+      result = random.nextInt(3) + 1; // 1-3
+      num2 = random.nextInt(3) + 2; // 2-4
       num1 = result * num2;
       break;
     case 'MEDIUM':
-      result = random.nextInt(7) + 3; // 3-9
-      num2 = random.nextInt(6) + 4; // 4-9
+      result = random.nextInt(4) + 2; // 2-5
+      num2 = random.nextInt(2) + 2; // 2-3
       num1 = result * num2;
       break;
     case 'HARD':
-      result = random.nextInt(12) + 8; // 8-19
-      num2 = random.nextInt(10) + 6; // 6-15
+      result = random.nextInt(4) + 2; // 2-5
+      num2 = random.nextInt(4) +
+          6; // 6-9 (this might make num1 > 9, but result will be single-digit)
       num1 = result * num2;
       break;
     default:
-      result = 2;
-      num2 = 3;
+      result = random.nextInt(3) + 1; // 1-3
+      num2 = random.nextInt(3) + 2; // 2-4
       num1 = result * num2;
   }
 
@@ -491,31 +478,28 @@ Map<String, dynamic> _generateDivisionQuestion(String difficulty, String type) {
       question = contexts[random.nextInt(contexts.length)];
       break;
     case 'VERBAL':
+      final Map<int, String> numberWords = {
+        1: 'one',
+        2: 'two',
+        3: 'three',
+        4: 'four',
+        5: 'five',
+        6: 'six',
+        7: 'seven',
+        8: 'eight',
+        9: 'nine'
+      };
+
+      // Special handling for num1 that might be > 9 in hard division
+      String num1Word =
+          num1 <= 9 ? numberWords[num1] ?? num1.toString() : num1.toString();
+      String num2Word = numberWords[num2] ?? num2.toString();
+
       if (difficulty == 'EASY') {
-        final Map<int, String> numberWords = {
-          1: 'one',
-          2: 'two',
-          3: 'three',
-          4: 'four',
-          5: 'five',
-          6: 'six',
-          7: 'seven',
-          8: 'eight',
-          9: 'nine',
-          10: 'ten'
-        };
-        if (numberWords.containsKey(num1) && numberWords.containsKey(num2)) {
-          question =
-              'What is ${numberWords[num1]} divided by ${numberWords[num2]}?';
-        } else {
-          // Fallback for numbers not in the map
-          question = 'What is $num1 divided by $num2?';
-        }
+        question = 'What is $num1Word divided by $num2Word?';
       } else if (difficulty == 'MEDIUM') {
-        // For medium difficulty, use "divided by" instead of "÷"
         question = 'What is $num1 divided by $num2?';
       } else {
-        // For hard difficulty, use "quotient"
         question = 'What is the quotient when $num1 is divided by $num2?';
       }
       break;

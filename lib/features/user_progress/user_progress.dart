@@ -120,6 +120,8 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
     print(widget.courseName);
     print(widget.dyscalculiaType);
 
+    print(widget.questions);
+
     return authState.when(
       data: (AppUser? user) {
         if (user == null) {

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:camera/camera.dart';
-import 'package:giggle/core/constants/app_constants.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:giggle/core/services/database.service.dart';
 import 'package:giggle/core/widgets/next_button.dart';
 import 'package:giggle/features/teaching_sessions/analyticsTracker.dart';
@@ -189,7 +189,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
   Future<void> _sendCameraFrameForPrediction(String imagePath) async {
     try {
       _logInfo('Sending camera frame to ML server: $imagePath');
-      _logInfo('ML Server IP: $mlIP');
+      _logInfo('ML Server IP: 51.20.86.30');
 
       // Get concentration prediction
       final concentrationData = await _getPrediction(
@@ -216,7 +216,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
     required String endpoint,
     required String imagePath,
   }) async {
-    final uri = Uri.parse('http://$mlIP:8000/$endpoint/');
+    final uri = Uri.parse('${ApiEndpoints.endPoint}/$endpoint/');
 
     var request = http.MultipartRequest('POST', uri);
     request.files.add(await http.MultipartFile.fromPath('image', imagePath));
@@ -342,7 +342,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
   // WEBSOCKETS AND MONITORING
 
   void _setupWebSockets() {
-    _logInfo('Setting up WebSockets with ML IP: $mlIP');
+    _logInfo('Setting up WebSockets with ML IP: 51.20.86.30');
 
     try {
       _setupConcentrationWebSocket();
@@ -355,8 +355,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
   }
 
   void _setupConcentrationWebSocket() {
-    final concentrationUri =
-        Uri.parse('ws://$mlIP:8000/ws/concentration-status');
+    final concentrationUri = Uri.parse(ApiEndpoints.concentrationWebSocket);
     _concentrationChannel = WebSocketChannel.connect(concentrationUri);
     _concentrationChannel!.stream.listen(
       (data) {
@@ -375,7 +374,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
   }
 
   void _setupEmotionWebSocket() {
-    final emotionUri = Uri.parse('ws://$mlIP:8000/ws/detect-emotion');
+    final emotionUri = Uri.parse(ApiEndpoints.detectEmotion);
     _emotionChannel = WebSocketChannel.connect(emotionUri);
     _emotionChannel!.stream.listen(
       (data) {
@@ -549,7 +548,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
 
   Future<void> _notifyMLServer() async {
     try {
-      final uri = Uri.parse('http://$mlIP:8000/stop-stream');
+      final uri = Uri.parse(ApiEndpoints.stopStream);
       await http.get(uri).timeout(const Duration(seconds: 2));
     } catch (e) {
       _logError('Error notifying ML server: $e');

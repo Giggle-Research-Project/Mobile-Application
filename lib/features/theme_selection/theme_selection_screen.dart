@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:giggle/core/models/theme_option.dart';
 import 'package:giggle/core/providers/theme_provider.dart';
+import 'package:giggle/main.dart';
 
 class ThemeSelectionScreen extends ConsumerStatefulWidget {
   final bool isInitialSelection;
@@ -264,6 +265,10 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen>
         await ref
             .read(themeProvider.notifier)
             .updateTheme(selectedTheme.primaryColor);
+
+        if (widget.isInitialSelection) {
+          await setFirstLoginComplete();
+        }
 
         if (mounted) {
           if (widget.isInitialSelection) {

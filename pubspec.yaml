@@ -57,6 +57,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/booze.png
     - assets/3d_models/numbers/number_0.glb
     - assets/3d_models/numbers/number_1.glb
     - assets/3d_models/numbers/number_2.glb
@@ -79,18 +80,18 @@ flutter:
     - assets/3d_models/orange.glb
     - assets/3d_models/animated_a.fbx
     - assets/3d_models/animated_a.glb
-    # - assets/videos/Procedural_Dyscalculia_Division.mp4
-    # - assets/videos/Procedural_Dyscalculia_Subtraction.mp4
-    # - assets/videos/Procedural_Dyscalculia_Addition.mp4
-    # - assets/videos/Procedural_Dyscalculia_Multiplication.mp4
-    # - assets/videos/Verbal_Dyscalculia_Multiplication.mp4
-    # - assets/videos/Verbal_Dyscalculia_Addition.mp4
-    # - assets/videos/Verbal_Dyscalculia_Division.mp4
-    # - assets/videos/Verbal_Dyscalculia_Subtraction.mp4
-    # - assets/videos/Semantic_Dyscalculia_Subtraction.mp4
-    # - assets/videos/Semantic_Dyscalculia_Multiplication.mp4
-    # - assets/videos/Semantic_Dyscalculia_Addition.mp4
-    # - assets/videos/Semantic_Dyscalculia_Division.mp4
+    - assets/videos/Procedural_Dyscalculia_Division.mp4
+    - assets/videos/Procedural_Dyscalculia_Subtraction.mp4
+    - assets/videos/Procedural_Dyscalculia_Addition.mp4
+    - assets/videos/Procedural_Dyscalculia_Multiplication.mp4
+    - assets/videos/Verbal_Dyscalculia_Multiplication.mp4
+    - assets/videos/Verbal_Dyscalculia_Addition.mp4
+    - assets/videos/Verbal_Dyscalculia_Division.mp4
+    - assets/videos/Verbal_Dyscalculia_Subtraction.mp4
+    - assets/videos/Semantic_Dyscalculia_Subtraction.mp4
+    - assets/videos/Semantic_Dyscalculia_Multiplication.mp4
+    - assets/videos/Semantic_Dyscalculia_Addition.mp4
+    - assets/videos/Semantic_Dyscalculia_Division.mp4
 
     - lib/config/.env
 

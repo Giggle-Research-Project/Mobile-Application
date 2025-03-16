@@ -1,6 +1,6 @@
 import 'dart:io';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PredictVoiceEmotionService {
   final Map<String, String> _emotionMap = {
@@ -21,8 +21,7 @@ class PredictVoiceEmotionService {
       Function setState,
       String currentEmotion) async {
     try {
-      final mlIP = dotenv.env['MLIP'] ?? '127.0.0.1';
-      final url = Uri.parse('http://$mlIP:8000/predict-emotion/');
+      final url = Uri.parse(ApiEndpoints.predictVoiceEmotion);
 
       var request = http.MultipartRequest('POST', url)
         ..files.add(await http.MultipartFile.fromPath('file', audioFile.path));

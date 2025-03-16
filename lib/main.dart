@@ -55,7 +55,7 @@ class MyApp extends ConsumerWidget {
             '/home': (context) => const AuthWrapper(),
             '/theme': (context) => const ThemeSelectionScreen(),
             '/guide': (context) => const MonsterGuideScreen(),
-            '/dashboard': (context) => const DashboardScreen(),
+            '/dashboard': (context) => const DashBoardScreen(),
           },
         );
       },
@@ -92,13 +92,24 @@ class AuthWrapper extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final firstLoginState = ref.watch(firstLoginProvider);
 
     return authState.when(
       data: (user) {
         if (user == null) {
           return const LoginPage();
         }
-        return const MainScreen();
+
+        return firstLoginState.when(
+          data: (isFirstLogin) {
+            if (isFirstLogin) {
+              return ThemeSelectionScreen(isInitialSelection: true);
+            }
+            return const MainScreen();
+          },
+          loading: () => const SplashScreen(),
+          error: (_, __) => const MainScreen(),
+        );
       },
       loading: () => const SplashScreen(),
       error: (error, stack) => Scaffold(
@@ -108,4 +119,14 @@ class AuthWrapper extends ConsumerWidget {
       ),
     );
   }
+}
+
+final firstLoginProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool('is_first_login') ?? true;
+});
+
+Future<void> setFirstLoginComplete() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('is_first_login', false);
 }

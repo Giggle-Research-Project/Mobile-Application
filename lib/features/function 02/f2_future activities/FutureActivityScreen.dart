@@ -1,320 +1,454 @@
+import 'dart:async';
+
+import 'package:ar_flutter_plugin/ar_flutter_plugin.dart';
+import 'package:ar_flutter_plugin/datatypes/config_planedetection.dart';
+import 'package:ar_flutter_plugin/datatypes/hittest_result_types.dart';
+import 'package:ar_flutter_plugin/datatypes/node_types.dart';
+import 'package:ar_flutter_plugin/managers/ar_anchor_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_location_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin/models/ar_anchor.dart';
+import 'package:ar_flutter_plugin/models/ar_hittest_result.dart';
+import 'package:ar_flutter_plugin/models/ar_node.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vector_math/vector_math_64.dart' as vector_math;
 
-// Difficulty Selection Screen
-class DyscalculiaActivityScreen extends StatelessWidget {
-  const DyscalculiaActivityScreen({Key? key}) : super(key: key);
+import 'package:giggle/core/constants/3d_models_constants.dart';
+import 'package:giggle/core/models/user_model.dart';
+import 'package:giggle/core/providers/auth_provider.dart';
+import 'package:giggle/core/providers/theme_provider.dart';
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Select Difficulty Level',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    _buildUserStats(),
-                    const SizedBox(height: 30),
-                    const Text(
-                      'Choose Your Level',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Select a difficulty level that matches your skills',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.85,
-                  crossAxisSpacing: 15,
-                  mainAxisSpacing: 15,
-                ),
-                delegate: SliverChildListDelegate([
-                  _buildDifficultyCard(
-                    context: context,
-                    title: 'Beginner',
-                    icon: Icons.child_care,
-                    color: const Color(0xFF4CAF50),
-                    description: 'Perfect for starting',
-                    level: 1,
-                  ),
-                  _buildDifficultyCard(
-                    context: context,
-                    title: 'Easy',
-                    icon: Icons.stars_outlined,
-                    color: const Color(0xFF2196F3),
-                    description: 'Basic challenges',
-                    level: 2,
-                  ),
-                  _buildDifficultyCard(
-                    context: context,
-                    title: 'Medium',
-                    icon: Icons.trending_up,
-                    color: const Color(0xFFFF9800),
-                    description: 'Intermediate tasks',
-                    level: 3,
-                  ),
-                  _buildDifficultyCard(
-                    context: context,
-                    title: 'Hard',
-                    icon: Icons.psychology,
-                    color: const Color(0xFFE91E63),
-                    description: 'Advanced challenges',
-                    level: 4,
-                  ),
-                  _buildDifficultyCard(
-                    context: context,
-                    title: 'Expert',
-                    icon: Icons.workspace_premium,
-                    color: const Color(0xFF9C27B0),
-                    description: 'Master level tasks',
-                    level: 5,
-                  ),
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+import '../widgets/index.dart';
 
-  Widget _buildUserStats() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6200EA), Color(0xFF3F51B5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6200EA).withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Your Progress',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Icon(Icons.emoji_events, color: Colors.amber, size: 28),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(value: '75%', label: 'Accuracy'),
-              _buildStatItem(value: '12', label: 'Activities'),
-              _buildStatItem(value: '320', label: 'Points'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+class SemanticFutureScreen extends ConsumerStatefulWidget {
+  final String index;
+  final String courseName;
+  final List<Map<String, dynamic>> questions;
 
-  Widget _buildStatItem({required String value, required String label}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDifficultyCard({
-    required BuildContext context,
-    required String title,
-    required IconData icon,
-    required Color color,
-    required String description,
-    required int level,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ActivitiesScreen(
-              difficulty: title,
-              level: level,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 35),
-            ),
-            const SizedBox(height: 15),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              description,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.black54,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                5,
-                (index) => Icon(
-                  Icons.star,
-                  size: 12,
-                  color: index < level ? color : Colors.grey.withOpacity(0.3),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Activities Screen
-class ActivitiesScreen extends StatelessWidget {
-  final String difficulty;
-  final int level;
-
-  const ActivitiesScreen({
+  const SemanticFutureScreen({
     Key? key,
-    required this.difficulty,
-    required this.level,
+    required this.questions,
+    required this.courseName,
+    required this.index,
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final activities = _getActivitiesByLevel(level);
+  _SemanticFutureScreenState createState() => _SemanticFutureScreenState();
+}
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          '$difficulty Activities',
-          style: const TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
+class _SemanticFutureScreenState extends ConsumerState<SemanticFutureScreen> {
+  ARSessionManager? arSessionManager;
+  ARObjectManager? arObjectManager;
+  ARAnchorManager? arAnchorManager;
+
+  List<ARNode> nodes = [];
+  List<ARAnchor> anchors = [];
+  Map<String, String> nodeTypes = {};
+  bool showTutorial = false;
+  String? lastTappedNode;
+
+  String selectedModel = "Apple";
+  double modelScale = 0.2;
+  late ValueNotifier<Map<String, int>> modelCountNotifier;
+
+  // Add debounce variables
+  DateTime? lastTapTime;
+  static const tapDebounceTime = Duration(milliseconds: 1000);
+  bool isProcessingTap = false;
+
+  int _timeElapsed = 0;
+  Timer? _timer;
+
+  // Improved model counting
+  Map<String, int> modelCounts = {
+    'Apple': 0,
+    'Orange': 0,
+  };
+
+  Map<String, int> get currentModelCounts {
+    Map<String, int> counts = {'Apple': 0, 'Orange': 0};
+
+    for (String type in nodeTypes.values) {
+      if (type == 'Apple') counts['Apple'] = counts['Apple']! + 1;
+      if (type == 'Orange') counts['Orange'] = counts['Orange']! + 1;
+    }
+
+    return counts;
+  }
+
+  void _debugPrintState() {
+    print('\===============- Current State =================');
+    print('Nodes length: ${nodes.length}');
+    print('Anchors length: ${anchors.length}');
+    print('NodeTypes: $nodeTypes');
+    print('Model counts: $modelCounts');
+    print('==================================================\n');
+  }
+
+  final Map<String, ARAnchor> nodeToAnchorMap = {};
+
+  Future<void> onRemoveSelectedNode() async {
+    if (lastTappedNode == null) return;
+
+    try {
+      ARNode? nodeToRemove;
+      try {
+        nodeToRemove = nodes.firstWhere(
+          (node) => node.name == lastTappedNode,
+        );
+      } catch (e) {
+        return;
+      }
+
+      final anchorToRemove = nodeToAnchorMap[lastTappedNode];
+
+      if (anchorToRemove != null) {
+        await arObjectManager!.removeNode(nodeToRemove);
+        await arAnchorManager!.removeAnchor(anchorToRemove);
+
+        setState(() {
+          nodes.removeWhere((node) => node.name == lastTappedNode);
+          anchors.remove(anchorToRemove);
+          nodeToAnchorMap.remove(lastTappedNode);
+          nodeTypes.remove(lastTappedNode);
+          lastTappedNode = null;
+
+          _recalculateModelCounts();
+        });
+      }
+    } catch (e) {}
+  }
+
+  Future<void> onPlaneOrPointTapped(
+      List<ARHitTestResult> hitTestResults) async {
+    if (isProcessingTap) return;
+
+    final now = DateTime.now();
+    if (lastTapTime != null && now.difference(lastTapTime!) < tapDebounceTime) {
+      return;
+    }
+    lastTapTime = now;
+
+    setState(() => isProcessingTap = true);
+
+    try {
+      ARHitTestResult? planeHitResult;
+      try {
+        planeHitResult = hitTestResults.firstWhere(
+          (result) => result.type == ARHitTestResultType.plane,
+        );
+      } catch (e) {
+        return;
+      }
+
+      {
+        final newAnchor = ARPlaneAnchor(
+          transformation: planeHitResult.worldTransform,
+        );
+
+        final anchorAdded = await arAnchorManager!.addAnchor(newAnchor);
+        if (anchorAdded == true) {
+          final nodeName =
+              '${selectedModel.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
+
+          final newNode = ARNode(
+            name: nodeName,
+            type: NodeType.webGLB,
+            uri: availableModels[selectedModel]!,
+            scale: vector_math.Vector3(modelScale, modelScale, modelScale),
+            position: vector_math.Vector3(0.0, 0.0, 0.0),
+            rotation: vector_math.Vector4(1.0, 0.0, 0.0, 0.0),
+          );
+
+          final nodeAdded = await arObjectManager!.addNode(
+            newNode,
+            planeAnchor: newAnchor,
+          );
+
+          if (nodeAdded == true) {
+            setState(() {
+              nodes.add(newNode);
+              anchors.add(newAnchor);
+              nodeToAnchorMap[nodeName] = newAnchor;
+              nodeTypes[nodeName] = selectedModel;
+              _recalculateModelCounts();
+            });
+          } else {
+            await arAnchorManager!.removeAnchor(newAnchor);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error in onPlaneOrPointTapped: $e');
+    } finally {
+      setState(() => isProcessingTap = false);
+    }
+  }
+
+  void _recalculateModelCounts() {
+    final newCounts = <String, int>{
+      'Apple': 0,
+      'Orange': 0,
+    };
+
+    for (final type in nodeTypes.values) {
+      if (newCounts.containsKey(type)) {
+        newCounts[type] = newCounts[type]! + 1;
+      }
+    }
+
+    setState(() {
+      modelCounts = newCounts;
+      modelCountNotifier.value = newCounts;
+    });
+
+    print('Recalculated counts: $modelCounts');
+    _debugPrintState();
+  }
+
+  // Modify the updateModelCounts method
+  void updateModelCounts() {
+    Map<String, int> newCounts = {
+      'Apple': 0,
+      'Orange': 0,
+    };
+
+    // Count directly from nodeTypes
+    nodeTypes.forEach((nodeName, type) {
+      if (newCounts.containsKey(type)) {
+        newCounts[type] = (newCounts[type] ?? 0) + 1;
+      }
+    });
+
+    setState(() {
+      modelCounts = newCounts;
+      print('Model counts updated: $modelCounts');
+    });
+  }
+
+  Widget _buildCounterPill(String label, int target, IconData icon) {
+    // Get real-time count
+    final current = currentModelCounts[label] ?? 0;
+    final isComplete = current == target;
+    final color = isComplete ? Colors.green : Colors.grey[800]!;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
       ),
-      body: SafeArea(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: color,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$current/$target',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Add this method to the class to help track state changes
+  @override
+  void didUpdateWidget(SemanticFutureScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    print('Widget updated. Current counts: $modelCounts');
+  }
+
+// Add this method to help with debugging
+  void printCurrentState() {
+    print('Current State:');
+    print('Nodes count: ${nodes.length}');
+    print('Anchors count: ${anchors.length}');
+    print('NodeTypes: $nodeTypes');
+    print('ModelCounts: $modelCounts');
+    print('LastTappedNode: $lastTappedNode');
+    print('SelectedModel: $selectedModel');
+  }
+
+  int getModelCount(String modelType) {
+    return modelCounts[modelType] ?? 0;
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        _timeElapsed++;
+      });
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+    modelCountNotifier = ValueNotifier<Map<String, int>>({
+      'Apple': 0,
+      'Orange': 0,
+    });
+  }
+
+  // Properly clean up all AR resources
+  void _cleanUpARResources() async {
+    print("Cleaning up AR resources");
+    try {
+      // Clear all nodes first
+      if (arObjectManager != null && nodes.isNotEmpty) {
+        for (final node in List.from(nodes)) {
+          await arObjectManager!.removeNode(node);
+        }
+      }
+
+      // Clear all anchors
+      if (arAnchorManager != null && anchors.isNotEmpty) {
+        for (final anchor in List.from(anchors)) {
+          await arAnchorManager!.removeAnchor(anchor);
+        }
+      }
+
+      // Reset lists and maps
+      nodes.clear();
+      anchors.clear();
+      nodeTypes.clear();
+      nodeToAnchorMap.clear();
+
+      // Dispose session manager last
+      if (arSessionManager != null) {
+        await arSessionManager!.dispose();
+      }
+
+      arSessionManager = null;
+      arObjectManager = null;
+      arAnchorManager = null;
+    } catch (e) {
+      print("Error cleaning up AR resources: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    modelCountNotifier.dispose();
+    arSessionManager!.dispose();
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print(widget.questions);
+    final authState = ref.watch(authProvider);
+    final themeData = ref.watch(themeProvider).valueOrNull ??
+        const AppTheme(primaryColor: Color(0xFF4F46E5));
+    final themeColor = themeData.primaryColor;
+
+    return authState.when(
+      data: (AppUser? user) {
+        if (user == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(context, '/login');
+          });
+          return const SizedBox.shrink();
+        }
+
+        return Scaffold(
+          body: Stack(
+            children: [
+              ARView(
+                onARViewCreated: onARViewCreated,
+                planeDetectionConfig:
+                    PlaneDetectionConfig.horizontalAndVertical,
+              ),
+              SafeArea(
+                child: Column(
+                  children: [
+                    QuestionCard(
+                        index: widget.index,
+                        questions: widget.questions,
+                        courseName: widget.courseName),
+                    const Spacer(),
+                    _buildControlPanel(
+                      themeColor: themeColor,
+                      userId: user.uid,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(child: Text('Error: ${error.toString()}')),
+      ),
+    );
+  }
+
+  Widget _buildControlPanel(
+      {required Color themeColor, required String userId}) {
+    return Container(
+      padding: const EdgeInsets.only(top: 8, bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.98),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _buildLevelHeader(level),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: activities.length,
-                itemBuilder: (context, index) {
-                  final activity = activities[index];
-                  return _buildActivityCard(
-                    context: context,
-                    activity: activity,
-                    index: index,
-                  );
-                },
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              width: 36,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  if (lastTappedNode != null) _buildDeleteButton(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildModelSelector(themeColor),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildCheckButton(themeColor, userId),
+                ],
               ),
             ),
           ],
@@ -323,357 +457,428 @@ class ActivitiesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLevelHeader(int level) {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _getLevelColor(level),
-            _getLevelColor(level).withOpacity(0.7),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: _getLevelColor(level).withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Widget _buildDeleteButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onRemoveSelectedNode,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
+          child: const Icon(
+            Icons.delete_outline,
+            color: Colors.red,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelSelector(Color themeColor) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          Icon(
-            _getLevelIcon(level),
-            color: Colors.white,
-            size: 40,
+          if (widget.courseName == 'Addition') ...[
+            Expanded(
+              child: _buildModelOption("Apple", Icons.apple, themeColor),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildModelOption("Orange", Icons.circle, themeColor),
+            ),
+          ] else
+            Expanded(
+              child: _buildModelOption("Apple", Icons.apple, themeColor),
+            )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModelOption(String model, IconData icon, Color themeColor) {
+    final isSelected = selectedModel == model;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => selectedModel = model),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? themeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 20),
-          Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.white : Colors.grey[600],
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                model,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCheckButton(Color themeColor, String userId) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => checkAnswer(userId),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: themeColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(
+            Icons.check_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> onNodeTapped(List<String> tappedNodes) async {
+    if (tappedNodes.isNotEmpty) {
+      final nodeExists = nodes.any((node) => node.name == tappedNodes.first);
+      setState(() {
+        lastTappedNode = nodeExists ? tappedNodes.first : null;
+      });
+    } else {
+      setState(() {
+        lastTappedNode = null;
+      });
+    }
+  }
+
+  void onARViewCreated(
+    ARSessionManager arSessionManager,
+    ARObjectManager arObjectManager,
+    ARAnchorManager arAnchorManager,
+    ARLocationManager arLocationManager,
+  ) {
+    this.arSessionManager = arSessionManager;
+    this.arObjectManager = arObjectManager;
+    this.arAnchorManager = arAnchorManager;
+
+    this.arSessionManager!.onInitialize(
+          showFeaturePoints: false,
+          showPlanes: true,
+          showWorldOrigin: true,
+          handlePans: true,
+          handleRotation: true,
+        );
+
+    this.arObjectManager!.onInitialize();
+
+    this.arSessionManager!.onPlaneOrPointTap = onPlaneOrPointTapped;
+    this.arObjectManager!.onNodeTap = onNodeTapped;
+    this.arObjectManager!.onPanStart = onPanStarted;
+    this.arObjectManager!.onPanChange = onPanChanged;
+    this.arObjectManager!.onPanEnd = onPanEnded;
+    this.arObjectManager!.onRotationStart = onRotationStarted;
+    this.arObjectManager!.onRotationChange = onRotationChanged;
+    this.arObjectManager!.onRotationEnd = onRotationEnded;
+  }
+
+  void checkAnswer(String userId) {
+    String getQuestionKey(String index) {
+      switch (index) {
+        case '0':
+          return 'questionOne';
+        case '1':
+          return 'questionTwo';
+        case '2':
+          return 'questionThree';
+        default:
+          return index;
+      }
+    }
+
+    if (widget.courseName == 'Addition') {
+      final appleCount = modelCounts['Apple'] ?? 0;
+      final orangeCount = modelCounts['Orange'] ?? 0;
+      final isCorrect = appleCount == widget.questions[0]['num1'] &&
+          orangeCount == widget.questions[0]['num2'];
+
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Level $level - $difficulty',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
+                const Icon(
+                  Icons.check_circle,
+                  size: 64,
+                  color: Colors.green,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Submit Answer',
+                  style: TextStyle(
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  _getLevelDescription(level),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    _cleanUpARResources();
+                    if (isCorrect) {
+                      // Save progress to Firestore
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .collection(getQuestionKey(widget.index))
+                          .doc('status')
+                          .set({
+                        'completed': true,
+                        'isCorrect': isCorrect,
+                        'timestamp': FieldValue.serverTimestamp(),
+                        'timeElapsed': _timeElapsed,
+                      }, SetOptions(merge: true)).then((_) {
+                        print('Progress saved to Firestore');
+                        print(
+                            'Path: futureActivities/$userId/${widget.courseName}/Semantic Dyscalculia/solo_sessions/progress/${getQuestionKey(widget.index)}/status');
+                      }).catchError((error) =>
+                              print('Failed to save progress: $error'));
+                    } else {
+                      // Save progress to Firestore
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .collection(getQuestionKey(widget.index))
+                          .doc('status')
+                          .set({
+                        'completed': true,
+                        'isCorrect': isCorrect,
+                        'timestamp': FieldValue.serverTimestamp(),
+                        'timeElapsed': _timeElapsed,
+                      }, SetOptions(merge: true)).then((_) {
+                        print('Progress saved to Firestore');
+                        print(
+                            'Path: futureActivities/$userId/${widget.courseName}/Semantic Dyscalculia/solo_sessions/progress/${getQuestionKey(widget.index)}/status');
+                      }).catchError((error) =>
+                              print('Failed to save progress: $error'));
+                    }
+                    // If this is the last question (index 2), also update the overall progress
+                    if (widget.index == '2') {
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .set({
+                        'completed': true,
+                        'timestamp': FieldValue.serverTimestamp(),
+                      }, SetOptions(merge: true)).then((_) {
+                        print('Overall progress saved to Firestore');
+                        print(
+                            'Path: futureActivities/$userId/${widget.courseName}/Semantic Dyscalculia/solo_sessions/progress');
+                      }).catchError((error) =>
+                              print('Failed to save overall progress: $error'));
+                    }
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: const Text('Great Job!'),
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      );
+    } else {
+      final appleCount = modelCounts['Apple'] ?? 0;
+      final int expectedCount =
+          int.parse(widget.questions[0]['correctAnswer'].toString());
+      final int actualCount = appleCount;
+      final bool isCorrect = actualCount == expectedCount;
 
-  Widget _buildActivityCard({
-    required BuildContext context,
-    required Activity activity,
-    required int index,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _getLevelColor(level).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(15),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.check_circle,
+                  size: 64,
+                  color: Colors.green,
                 ),
-                child: Icon(
-                  activity.icon,
-                  color: _getLevelColor(level),
-                  size: 30,
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      activity.title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      activity.description,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Icon(Icons.timer_outlined, size: 16, color: Colors.grey[600]),
-              const SizedBox(width: 5),
-              Text(
-                '${activity.duration} mins',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(width: 20),
-              Icon(Icons.bar_chart, size: 16, color: Colors.grey[600]),
-              const SizedBox(width: 5),
-              Text(
-                '${activity.points} points',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const Spacer(),
-              ElevatedButton(
-                onPressed: () {
-                  // Navigate to AR activity
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _getLevelColor(level),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                const SizedBox(height: 16),
+                const Text(
+                  'Submit Answer',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: const Text(
-                  'Start',
-                  style: TextStyle(color: Colors.white),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    _cleanUpARResources();
+                    if (isCorrect) {
+                      // Save progress to Firestore
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .collection(getQuestionKey(widget.index))
+                          .doc('status')
+                          .set({
+                            'completed': true,
+                            'isCorrect': isCorrect,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'timeElapsed': _timeElapsed,
+                          }, SetOptions(merge: true))
+                          .then((_) => print('Progress saved to Firestore'))
+                          .catchError((error) =>
+                              print('Failed to save progress: $error'));
+                    } else {
+                      // Save progress to Firestore
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .collection(getQuestionKey(widget.index))
+                          .doc('status')
+                          .set({
+                            'completed': true,
+                            'isCorrect': isCorrect,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'timeElapsed': _timeElapsed,
+                          }, SetOptions(merge: true))
+                          .then((_) => print('Progress saved to Firestore'))
+                          .catchError((error) =>
+                              print('Failed to save progress: $error'));
+                    }
+                    // If this is the last question (index 2), also update the overall progress
+                    if (widget.index == '2') {
+                      FirebaseFirestore.instance
+                          .collection('futureActivities')
+                          .doc(userId)
+                          .collection(widget.courseName)
+                          .doc('Semantic Dyscalculia')
+                          .collection('solo_sessions')
+                          .doc('progress')
+                          .set({
+                            'completed': true,
+                            'timestamp': FieldValue.serverTimestamp(),
+                          }, SetOptions(merge: true))
+                          .then((_) =>
+                              print('Overall progress saved to Firestore'))
+                          .catchError((error) =>
+                              print('Failed to save overall progress: $error'));
+                    }
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Great Job!'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Color _getLevelColor(int level) {
-    switch (level) {
-      case 1:
-        return const Color(0xFF4CAF50);
-      case 2:
-        return const Color(0xFF2196F3);
-      case 3:
-        return const Color(0xFFFF9800);
-      case 4:
-        return const Color(0xFFE91E63);
-      case 5:
-        return const Color(0xFF9C27B0);
-      default:
-        return Colors.grey;
+        ),
+      );
     }
   }
 
-  IconData _getLevelIcon(int level) {
-    switch (level) {
-      case 1:
-        return Icons.child_care;
-      case 2:
-        return Icons.stars_outlined;
-      case 3:
-        return Icons.trending_up;
-      case 4:
-        return Icons.psychology;
-      case 5:
-        return Icons.workspace_premium;
-      default:
-        return Icons.error;
-    }
+  // Gesture handlers
+  void onPanStarted(String nodeName) {
+    print("Started panning node $nodeName");
   }
 
-  String _getLevelDescription(int level) {
-    switch (level) {
-      case 1:
-        return 'Start your journey with basic activities';
-      case 2:
-        return 'Build your confidence with simple challenges';
-      case 3:
-        return 'Test your skills with intermediate tasks';
-      case 4:
-        return 'Challenge yourself with complex problems';
-      case 5:
-        return 'Master level activities for experts';
-      default:
-        return 'Unknown level';
-    }
+  void onPanChanged(String nodeName) {
+    print("Continued panning node $nodeName");
   }
 
-  List<Activity> _getActivitiesByLevel(int level) {
-    switch (level) {
-      case 1:
-        return [
-          Activity(
-            title: 'Basic Counting',
-            description: 'Count objects from 1 to 3',
-            duration: 5,
-            points: 50,
-            icon: Icons.looks_one,
-          ),
-          Activity(
-            title: 'Number Recognition',
-            description: 'Identify numbers 1-5',
-            duration: 7,
-            points: 75,
-            icon: Icons.filter_1,
-          ),
-          Activity(
-            title: 'Simple Matching',
-            description: 'Match similar objects',
-            duration: 6,
-            points: 60,
-            icon: Icons.compare_arrows,
-          ),
-        ];
-      case 2:
-        return [
-          Activity(
-            title: 'Extended Counting',
-            description: 'Count objects from 1 to 5',
-            duration: 8,
-            points: 100,
-            icon: Icons.looks_two,
-          ),
-          Activity(
-            title: 'Basic Addition',
-            description: 'Add numbers up to 5',
-            duration: 10,
-            points: 120,
-            icon: Icons.add_circle_outline,
-          ),
-          Activity(
-            title: 'Pattern Recognition',
-            description: 'Identify simple patterns',
-            duration: 9,
-            points: 110,
-            icon: Icons.grid_on,
-          ),
-        ];
-      case 3:
-        return [
-          Activity(
-            title: 'Advanced Counting',
-            description: 'Count objects from 1 to 10',
-            duration: 12,
-            points: 150,
-            icon: Icons.looks_3,
-          ),
-          Activity(
-            title: 'Subtraction Basics',
-            description: 'Subtract numbers up to 10',
-            duration: 15,
-            points: 180,
-            icon: Icons.remove_circle_outline,
-          ),
-          Activity(
-            title: 'Shape Sorting',
-            description: 'Sort objects by shape and size',
-            duration: 13,
-            points: 160,
-            icon: Icons.category,
-          ),
-        ];
-      case 4:
-        return [
-          Activity(
-            title: 'Complex Operations',
-            description: 'Mixed addition and subtraction',
-            duration: 18,
-            points: 200,
-            icon: Icons.looks_4,
-          ),
-          Activity(
-            title: 'Number Sequences',
-            description: 'Complete number patterns',
-            duration: 20,
-            points: 220,
-            icon: Icons.linear_scale,
-          ),
-          Activity(
-            title: 'Problem Solving',
-            description: 'Solve word problems',
-            duration: 17,
-            points: 210,
-            icon: Icons.psychology,
-          ),
-        ];
-      case 5:
-        return [
-          Activity(
-            title: 'Master Challenge',
-            description: 'Complex mathematical operations',
-            duration: 25,
-            points: 300,
-            icon: Icons.workspace_premium,
-          ),
-          Activity(
-            title: 'Speed Math',
-            description: 'Quick calculations under time',
-            duration: 22,
-            points: 280,
-            icon: Icons.speed,
-          ),
-          Activity(
-            title: 'Logic Puzzles',
-            description: 'Advanced problem solving',
-            duration: 23,
-            points: 290,
-            icon: Icons.extension,
-          ),
-        ];
-      default:
-        return [];
-    }
+  void onPanEnded(String nodeName, Matrix4 newTransform) {
+    print("Ended panning node $nodeName");
   }
-}
 
-class Activity {
-  final String title;
-  final String description;
-  final int duration;
-  final int points;
-  final IconData icon;
+  void onRotationStarted(String nodeName) {
+    print("Started rotating node $nodeName");
+  }
 
-  Activity({
-    required this.title,
-    required this.description,
-    required this.duration,
-    required this.points,
-    required this.icon,
-  });
+  void onRotationChanged(String nodeName) {
+    print("Continued rotating node $nodeName");
+  }
+
+  void onRotationEnded(String nodeName, Matrix4 newTransform) {
+    print("Ended rotating node $nodeName");
+  }
 }
