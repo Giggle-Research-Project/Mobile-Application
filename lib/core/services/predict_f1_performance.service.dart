@@ -1,4 +1,4 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -9,10 +9,6 @@ Future<String> predictF1Performance(
   RegExpMatch? parentTimeMatch,
 ) async {
   try {
-    final mlIP = dotenv.env['MLIP']?.isNotEmpty == true
-        ? dotenv.env['MLIP']
-        : dotenv.env['DEFAULT_MLIP'] ?? 'localhost';
-
     // Convert time strings to minutes
     final int childTimeMinutes = skillTimeMatch != null
         ? ((int.tryParse(skillTimeMatch.group(1) ?? '0') ?? 0) +
@@ -27,7 +23,7 @@ Future<String> predictF1Performance(
         : 0;
 
     // Create the API endpoint URI
-    final uri = Uri.parse("http://$mlIP:8000/predict-f1-performance/");
+    final uri = Uri.parse(ApiEndpoints.predictPerformance);
 
     // Create request body with CORRECT parameter names as per API specification
     final requestBody = jsonEncode({
