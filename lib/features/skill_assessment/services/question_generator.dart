@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:giggle/core/constants/apitude_question_constants.dart';
 import 'package:giggle/core/data/question_request.dart';
 import 'package:giggle/core/models/question_model.dart';
@@ -11,15 +12,32 @@ import 'package:http/http.dart' as http;
 class OptionsGenerator {
   final Random _random = Random();
 
+  // Helper method to ensure 2-digit numbers
+  int _ensure2Digit(int number) {
+    if (number < 10) {
+      // Convert single-digit to 2-digit
+      return number + 10 + _random.nextInt(80);
+    } else if (number >= 100) {
+      // Convert 3+ digit to 2-digit
+      return 10 + _random.nextInt(89);
+    }
+    return number;
+  }
+
   List<String> generateSequentialOptions(int correctNumber, int count) {
+    // Ensure correctNumber is 2-digit and < 100
+    correctNumber = _ensure2Digit(correctNumber);
     final options = <String>{correctNumber.toString()};
 
     while (options.length < count) {
       final offset = _random.nextInt(5) + 1;
-      final option =
-          (correctNumber + (_random.nextBool() ? offset : -offset)).toString();
-      if (!options.contains(option) && int.parse(option) > 0) {
-        options.add(option);
+      int option = correctNumber + (_random.nextBool() ? offset : -offset);
+
+      // Ensure option is 2-digit and < 100
+      option = _ensure2Digit(option);
+
+      if (!options.contains(option.toString())) {
+        options.add(option.toString());
       }
     }
 
@@ -28,16 +46,20 @@ class OptionsGenerator {
 
   List<String> generateOptions(String correctAnswer, int range) {
     final options = <String>{correctAnswer};
-    final correctNum = int.parse(correctAnswer);
+    int correctNum = int.parse(correctAnswer);
+
+    // Ensure correctNum is 2-digit and < 100
+    correctNum = _ensure2Digit(correctNum);
 
     while (options.length < 4) {
       final offset = _random.nextInt(range) - (range ~/ 2);
-      final option = (correctNum + offset).toString();
+      int option = correctNum + offset;
 
-      if (!options.contains(option) &&
-          (option != correctAnswer) &&
-          int.parse(option) > 0) {
-        options.add(option);
+      // Ensure option is 2-digit and < 100
+      option = _ensure2Digit(option);
+
+      if (!options.contains(option.toString()) && option != correctNum) {
+        options.add(option.toString());
       }
     }
 
@@ -78,10 +100,22 @@ class OptionsGenerator {
   }
 
   List<String> generateNumberOptions(int correctNumber, int min, int max) {
+    // Ensure correctNumber is 2-digit if it's for a numeric question
+    if (min >= 10 && max <= 99) {
+      correctNumber = _ensure2Digit(correctNumber);
+    }
+
     final options = <String>{correctNumber.toString()};
 
     while (options.length < 4) {
-      final number = min + _random.nextInt(max - min + 1);
+      int number;
+      if (min >= 10 && max <= 99) {
+        // For numeric ranges that should be 2-digit
+        number = 10 + _random.nextInt(89);
+      } else {
+        number = min + _random.nextInt(max - min + 1);
+      }
+
       if (!options.contains(number.toString())) {
         options.add(number.toString());
       }
@@ -138,16 +172,8 @@ class VerbalQuestionGenerator {
   }
 
   int _getBaseNumberForDifficulty(String difficulty) {
-    switch (difficulty) {
-      case 'EASY':
-        return _random.nextInt(50) + 1;
-      case 'MEDIUM':
-        return _random.nextInt(100) + 1;
-      case 'HARD':
-        return _random.nextInt(1000) + 1;
-      default:
-        return _random.nextInt(50) + 1;
-    }
+    // Always return a 2-digit number < 100, regardless of difficulty
+    return 10 + _random.nextInt(89);
   }
 
   Question _generateVerbalComparisonQuestion(String difficulty) {
@@ -165,12 +191,20 @@ class VerbalQuestionGenerator {
   }
 
   (int, int) _generateNumberPairForDifficulty(String difficulty) {
-    final range = difficulty == 'EASY'
-        ? 50
-        : difficulty == 'MEDIUM'
-            ? 100
-            : 1000;
-    return (_random.nextInt(range) + 1, _random.nextInt(range) + 1);
+    // For "equal" cases, ensure both numbers are the same and < 100
+    if (_random.nextInt(10) < 3) {
+      // 30% chance for equal numbers
+      final number = 10 + _random.nextInt(89); // 2-digit number < 100
+      return (number, number);
+    } else {
+      // For non-equal cases, generate two different 2-digit numbers < 100
+      final num1 = 10 + _random.nextInt(89);
+      int num2;
+      do {
+        num2 = 10 + _random.nextInt(89);
+      } while (num1 == num2);
+      return (num1, num2);
+    }
   }
 
   Question _generateVerbalOddEvenQuestion(String difficulty) {
@@ -421,43 +455,92 @@ class TimeQuestionGenerator {
 /// Handles generation of procedural math questions
 class ProceduralQuestionGenerator {
   final OptionsGenerator _optionsGenerator = OptionsGenerator();
+  final Random _random = Random();
+
+  // Helper method to ensure 2-digit numbers
+  int _ensure2Digit(int number) {
+    if (number < 10) {
+      // Convert single-digit to 2-digit
+      return number + 10 + _random.nextInt(80);
+    } else if (number >= 100) {
+      // Convert 3+ digit to 2-digit
+      return 10 + _random.nextInt(89);
+    }
+    return number;
+  }
 
   Question generateProceduralQuestion(
       List<dynamic> questionData, String lesson, String difficulty) {
-    String correctAnswer;
     String questionText;
     List<String> options;
 
-    final strData = questionData.map((e) => e.toString()).toList();
+    // Process the data to ensure 2-digit numbers
+    List<int> processedData = [];
+    for (var i = 0; i < questionData.length; i++) {
+      try {
+        int val = int.parse(questionData[i].toString());
+        processedData.add(_ensure2Digit(val));
+      } catch (e) {
+        // If parsing fails, just keep the original data
+        processedData.add(10 + _random.nextInt(89));
+      }
+    }
+
+    // Recalculate the correct answer based on the processed numbers
+    int num1 = processedData[0];
+    int num2 = processedData[1];
+    int correctNum;
 
     switch (lesson) {
       case 'ADDITION':
-        correctAnswer = strData[2];
-        questionText = 'What is ${strData[0]} + ${strData[1]}?';
-        options = _optionsGenerator.generateOptions(
-            correctAnswer, _getDifficultyRange(difficulty));
+        correctNum = num1 + num2;
+        // Ensure the result is also 2-digit
+        if (correctNum >= 100) {
+          // If sum exceeds 99, adjust one of the numbers
+          num1 = _random.nextInt(40) + 10; // 10-49
+          num2 = _random.nextInt(40) + 10; // 10-49
+          correctNum = num1 + num2;
+        }
+        questionText = 'What is $num1 + $num2?';
         break;
       case 'SUBTRACTION':
-        correctAnswer = strData[2];
-        questionText = 'What is ${strData[0]} - ${strData[1]}?';
-        options = _optionsGenerator.generateOptions(
-            correctAnswer, _getDifficultyRange(difficulty));
+        // Ensure num1 > num2 for positive result
+        if (num1 <= num2) {
+          int temp = num1;
+          num1 = num2;
+          num2 = temp;
+        }
+        correctNum = num1 - num2;
+        // Ensure the result is 2-digit
+        if (correctNum < 10) {
+          // Adjust to ensure 2-digit result
+          num1 = 50 + _random.nextInt(40); // 50-89
+          num2 = 10 + _random.nextInt(30); // 10-39
+          correctNum = num1 - num2;
+        }
+        questionText = 'What is $num1 - $num2?';
         break;
       case 'MULTIPLICATION':
-        correctAnswer = strData[2];
-        questionText = 'What is ${strData[0]} × ${strData[1]}?';
-        options = _optionsGenerator.generateOptions(
-            correctAnswer, _getDifficultyRange(difficulty));
+        // For multiplication, use smaller numbers to keep product 2-digit
+        num1 = 2 + _random.nextInt(7); // 2-8
+        num2 = 5 + _random.nextInt(6); // 5-10
+        correctNum = num1 * num2;
+        questionText = 'What is $num1 × $num2?';
         break;
       case 'DIVISION':
-        correctAnswer = strData[2];
-        questionText = 'What is ${strData[0]} ÷ ${strData[1]}?';
-        options = _optionsGenerator.generateOptions(
-            correctAnswer, _getDifficultyRange(difficulty));
+        // For division, ensure clean division with 2-digit result
+        num2 = 2 + _random.nextInt(5); // 2-6
+        correctNum = 10 + _random.nextInt(90 ~/ num2); // Ensure 2-digit result
+        num1 = correctNum * num2; // This may be 3-digit
+        questionText = 'What is $num1 ÷ $num2?';
         break;
       default:
         throw ArgumentError('Unsupported lesson type: $lesson');
     }
+
+    String correctAnswer = correctNum.toString();
+    options = _optionsGenerator.generateOptions(
+        correctAnswer, _getDifficultyRange(difficulty));
 
     return Question(
       question: questionText,
@@ -541,7 +624,8 @@ class QuestionGenerator {
       }
 
       // For other types, use ML server
-      final uri = Uri.parse('http://$mlIP:8000/generate-question');
+      final uri = Uri.parse(ApiEndpoints.questionGenerate);
+      print('Requesting question from: $uri');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
