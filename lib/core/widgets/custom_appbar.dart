@@ -17,6 +17,7 @@ class CustomAppBar extends StatelessWidget {
       floating: true,
       backgroundColor: Colors.white,
       elevation: 0,
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         background: ClipRect(
           child: BackdropFilter(
