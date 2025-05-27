@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:http/http.dart' as http;
 
@@ -32,11 +33,15 @@ class PredictVoiceEmotionService {
       print('⭐ Voice Response: ${response.statusCode} - $responseData');
 
       if (response.statusCode == 200) {
-        final emotionClass = _emotionMap[responseData.trim()] ?? 'neutral';
+        // Parse JSON response
+        final jsonResponse = jsonDecode(responseData);
+        final predictedEmotion = jsonResponse['predicted_emotion'] as String;
 
         if (mounted) {
-          setState(() => currentEmotion = emotionClass);
-          onEmotionDetected(emotionClass);
+          setState(() {
+            currentEmotion = predictedEmotion;
+          });
+          onEmotionDetected(predictedEmotion);
         }
       }
 

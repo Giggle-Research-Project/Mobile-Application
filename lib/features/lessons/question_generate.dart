@@ -22,9 +22,9 @@ List<Map<String, dynamic>> generatePersonalizedQuestions(
   generatedQuestions
       .addAll(_generateSemanticQuestions(lessonType, semanticDifficulty));
 
-  // Generate Verbal Questions
-  generatedQuestions
-      .addAll(_generateVerbalQuestions(lessonType, verbalDifficulty));
+  // Generate Verbal Questions for all operations
+  final verbalQuestions = _generateVerbalQuestions(lessonType, verbalDifficulty);
+  generatedQuestions.addAll(verbalQuestions);
 
   return generatedQuestions;
 }
@@ -40,16 +40,16 @@ List<Map<String, dynamic>> _generateProceduralQuestions(
 
     switch (operation) {
       case 'ADDITION':
-        question = _generateAdditionQuestion(difficulty, 'PROCEDURAL');
+        question = _generateTwoDigitAdditionQuestion(difficulty);
         break;
       case 'SUBTRACTION':
-        question = _generateSubtractionQuestion(difficulty, 'PROCEDURAL');
+        question = _generateTwoDigitSubtractionQuestion(difficulty);
         break;
       case 'MULTIPLICATION':
-        question = _generateMultiplicationQuestion(difficulty, 'PROCEDURAL');
+        question = _generateTwoDigitMultiplicationQuestion(difficulty);
         break;
       case 'DIVISION':
-        question = _generateDivisionQuestion(difficulty, 'PROCEDURAL');
+        question = _generateTwoDigitDivisionQuestion(difficulty);
         break;
     }
 
@@ -61,7 +61,7 @@ List<Map<String, dynamic>> _generateProceduralQuestions(
   return questions;
 }
 
-// Function to generate semantic questions
+// Function to generate semantic questions (unchanged)
 List<Map<String, dynamic>> _generateSemanticQuestions(
     String operation, String difficulty) {
   final List<Map<String, dynamic>> questions = [];
@@ -93,39 +93,337 @@ List<Map<String, dynamic>> _generateSemanticQuestions(
   return questions;
 }
 
-// Function to generate verbal questions
+// Modify the _generateVerbalQuestions function to allow all operations:
 List<Map<String, dynamic>> _generateVerbalQuestions(
     String operation, String difficulty) {
   final List<Map<String, dynamic>> questions = [];
+  Map<String, dynamic> question = {};
 
-  // Generate 1 verbal question if applicable
-  if (difficulty != 'HARD' || operation == 'ADDITION') {
-    Map<String, dynamic> question = {};
+  // Generate verbal questions for all operations
+  switch (operation) {
+    case 'ADDITION':
+      question = _generateAdditionQuestion(difficulty, 'VERBAL');
+      break;
+    case 'SUBTRACTION':
+      question = _generateSubtractionQuestion(difficulty, 'VERBAL');
+      break;
+    case 'MULTIPLICATION':
+      question = _generateMultiplicationQuestion(difficulty, 'VERBAL');
+      break;
+    case 'DIVISION':
+      question = _generateDivisionQuestion(difficulty, 'VERBAL');
+      break;
+  }
 
-    switch (operation) {
-      case 'ADDITION':
-        question = _generateAdditionQuestion(difficulty, 'VERBAL');
-        break;
-      case 'SUBTRACTION':
-        question = _generateSubtractionQuestion(difficulty, 'VERBAL');
-        break;
-      case 'MULTIPLICATION':
-        question = _generateMultiplicationQuestion(difficulty, 'VERBAL');
-        break;
-      case 'DIVISION':
-        question = _generateDivisionQuestion(difficulty, 'VERBAL');
-        break;
-    }
-
-    if (question.isNotEmpty) {
-      questions.add(question);
-    }
+  if (question.isNotEmpty) {
+    questions.add(question);
   }
 
   return questions;
 }
 
-// Helper function to generate random options around a correct answer
+// NEW: Two-digit Addition question generator for procedural type only
+Map<String, dynamic> _generateTwoDigitAdditionQuestion(String difficulty) {
+  final random = Random();
+  int num1, num2;
+  String question;
+  dynamic correctAnswer;
+  List<String> options;
+
+  // Generate two-digit numbers based on difficulty, ensuring answer is 2 digits (10-99)
+  switch (difficulty) {
+    case 'EASY':
+      // For easy, use numbers like 10-20 + 10-20 to get 2-digit results
+      num1 = random.nextInt(11) + 10; // 10-20
+      num2 = random.nextInt(11) + 10; // 10-20
+      // Ensure the sum doesn't exceed 99
+      while (num1 + num2 > 99) {
+        num1 = random.nextInt(11) + 10;
+        num2 = random.nextInt(11) + 5;
+      }
+      break;
+    case 'MEDIUM':
+      // For medium, use numbers like 20-40 + 10-30
+      num1 = random.nextInt(21) + 20; // 20-40
+      num2 = random.nextInt(21) + 10; // 10-30
+      // Ensure the sum doesn't exceed 99
+      while (num1 + num2 > 99) {
+        num1 = random.nextInt(21) + 20;
+        num2 = random.nextInt(21) + 10;
+      }
+      break;
+    case 'HARD':
+      // For hard, use larger numbers like 30-60 + 20-40
+      num1 = random.nextInt(31) + 30; // 30-60
+      num2 = random.nextInt(21) + 20; // 20-40
+      // Ensure the sum doesn't exceed 99
+      while (num1 + num2 > 99) {
+        num1 = random.nextInt(31) + 30;
+        num2 = random.nextInt(21) + 20;
+      }
+      break;
+    default:
+      num1 = random.nextInt(21) + 20; // 20-40
+      num2 = random.nextInt(21) + 10; // 10-30
+      // Ensure the sum doesn't exceed 99
+      while (num1 + num2 > 99) {
+        num1 = random.nextInt(21) + 20;
+        num2 = random.nextInt(21) + 10;
+      }
+  }
+
+  correctAnswer = num1 + num2;
+  question = 'What is $num1 + $num2?';
+  options = _generateTwoDigitOptions(correctAnswer, difficulty);
+
+  return {
+    'question': question,
+    'options': options,
+    'correctAnswer': correctAnswer.toString(),
+    'dyscalculia_type': 'PROCEDURAL',
+    'lesson': 'ADDITION',
+    'difficulty': difficulty,
+    'num1': num1,
+    'num2': num2,
+  };
+}
+
+// NEW: Two-digit Subtraction question generator for procedural type only
+Map<String, dynamic> _generateTwoDigitSubtractionQuestion(String difficulty) {
+  final random = Random();
+  int num1, num2;
+  String question;
+  dynamic correctAnswer;
+  List<String> options;
+
+  // Generate two-digit numbers based on difficulty, ensuring answer is 2 digits (10-99)
+  switch (difficulty) {
+    case 'EASY':
+      // For easy, start with a number between 30-50 and subtract 10-20
+      num1 = random.nextInt(21) + 30; // 30-50
+      num2 = random.nextInt(11) + 10; // 10-20
+      // Ensure the difference is at least 10 (2 digits)
+      while (num1 - num2 < 10) {
+        num1 = random.nextInt(21) + 30;
+        num2 = random.nextInt(11) + 10;
+      }
+      break;
+    case 'MEDIUM':
+      // For medium, start with a number between 40-70 and subtract 15-30
+      num1 = random.nextInt(31) + 40; // 40-70
+      num2 = random.nextInt(16) + 15; // 15-30
+      // Ensure the difference is at least 10 and doesn't exceed 99
+      while (num1 - num2 < 10 || num1 - num2 > 99) {
+        num1 = random.nextInt(31) + 40;
+        num2 = random.nextInt(16) + 15;
+      }
+      break;
+    case 'HARD':
+      // For hard, start with a number between 60-99 and subtract 20-50
+      num1 = random.nextInt(40) + 60; // 60-99
+      num2 = random.nextInt(31) + 20; // 20-50
+      // Ensure the difference is at least 10 and doesn't exceed 99
+      while (num1 - num2 < 10 || num1 - num2 > 99) {
+        num1 = random.nextInt(40) + 60;
+        num2 = random.nextInt(31) + 20;
+      }
+      break;
+    default:
+      num1 = random.nextInt(31) + 40; // 40-70
+      num2 = random.nextInt(16) + 15; // 15-30
+      // Ensure the difference is at least 10
+      while (num1 - num2 < 10) {
+        num1 = random.nextInt(31) + 40;
+        num2 = random.nextInt(16) + 15;
+      }
+  }
+
+  correctAnswer = num1 - num2;
+  question = 'What is $num1 - $num2?';
+  options = _generateTwoDigitOptions(correctAnswer, difficulty);
+
+  return {
+    'question': question,
+    'options': options,
+    'correctAnswer': correctAnswer.toString(),
+    'dyscalculia_type': 'PROCEDURAL',
+    'lesson': 'SUBTRACTION',
+    'difficulty': difficulty,
+    'num1': num1,
+    'num2': num2,
+  };
+}
+
+// NEW: Two-digit Multiplication question generator for procedural type only
+Map<String, dynamic> _generateTwoDigitMultiplicationQuestion(
+    String difficulty) {
+  final random = Random();
+  int num1, num2;
+  String question;
+  dynamic correctAnswer;
+  List<String> options;
+
+  // Generate numbers based on difficulty, ensuring at least one 2-digit number
+  // But the product must be 2 digits (10-99)
+  switch (difficulty) {
+    case 'EASY':
+      // For easy, multiply a 2-digit number (10-15) by a single digit (1-4)
+      num1 = random.nextInt(6) + 10; // 10-15
+      num2 = random.nextInt(4) + 1; // 1-4
+      // Ensure the product is 2 digits (10-99)
+      while (num1 * num2 < 10 || num1 * num2 > 99) {
+        num1 = random.nextInt(6) + 10;
+        num2 = random.nextInt(4) + 1;
+      }
+      break;
+    case 'MEDIUM':
+      // For medium, multiply a 2-digit number (10-20) by a single digit (2-5)
+      num1 = random.nextInt(11) + 10; // 10-20
+      num2 = random.nextInt(4) + 2; // 2-5
+      // Ensure the product is 2 digits (10-99)
+      while (num1 * num2 < 10 || num1 * num2 > 99) {
+        num1 = random.nextInt(11) + 10;
+        num2 = random.nextInt(4) + 2;
+      }
+      break;
+    case 'HARD':
+      // For hard, we can use two-digit by single-digit with more challenging numbers
+      num1 = random.nextInt(10) + 15; // 15-24
+      num2 = random.nextInt(3) + 4; // 4-6
+      // Ensure the product is 2 digits (10-99)
+      while (num1 * num2 < 10 || num1 * num2 > 99) {
+        num1 = random.nextInt(10) + 15;
+        num2 = random.nextInt(3) + 4;
+      }
+      break;
+    default:
+      num1 = random.nextInt(11) + 10; // 10-20
+      num2 = random.nextInt(4) + 2; // 2-5
+      // Ensure the product is 2 digits (10-99)
+      while (num1 * num2 < 10 || num1 * num2 > 99) {
+        num1 = random.nextInt(11) + 10;
+        num2 = random.nextInt(4) + 2;
+      }
+  }
+
+  correctAnswer = num1 * num2;
+  question = 'What is $num1 × $num2?';
+  options = _generateTwoDigitOptions(correctAnswer, difficulty);
+
+  return {
+    'question': question,
+    'options': options,
+    'correctAnswer': correctAnswer.toString(),
+    'dyscalculia_type': 'PROCEDURAL',
+    'lesson': 'MULTIPLICATION',
+    'difficulty': difficulty,
+    'num1': num1,
+    'num2': num2,
+  };
+}
+
+// NEW: Two-digit Division question generator for procedural type only
+Map<String, dynamic> _generateTwoDigitDivisionQuestion(String difficulty) {
+  final random = Random();
+  int num1, num2, result;
+  String question;
+  dynamic correctAnswer;
+  List<String> options;
+
+  // We'll ensure at least the dividend is 2 digits,
+  // and the result (quotient) is between 10-99 (2 digits)
+
+  switch (difficulty) {
+    case 'EASY':
+      // For easy, we'll aim for results between 10-20
+      result = random.nextInt(11) + 10; // 10-20
+      num2 = random.nextInt(3) + 2; // 2-4
+      num1 = result * num2; // Guaranteed to be evenly divisible
+      break;
+    case 'MEDIUM':
+      // For medium, we'll aim for results between 15-30
+      result = random.nextInt(16) + 15; // 15-30
+      num2 = random.nextInt(3) + 3; // 3-5
+      num1 = result * num2; // Guaranteed to be evenly divisible
+      break;
+    case 'HARD':
+      // For hard, we'll aim for results between 25-50
+      result = random.nextInt(26) + 25; // 25-50
+      num2 = random.nextInt(4) + 2; // 2-5
+      num1 = result * num2; // Guaranteed to be evenly divisible
+      break;
+    default:
+      result = random.nextInt(16) + 15; // 15-30
+      num2 = random.nextInt(3) + 3; // 3-5
+      num1 = result * num2; // Guaranteed to be evenly divisible
+  }
+
+  correctAnswer = result;
+  question = 'What is $num1 ÷ $num2?';
+  options = _generateTwoDigitOptions(correctAnswer, difficulty);
+
+  return {
+    'question': question,
+    'options': options,
+    'correctAnswer': correctAnswer.toString(),
+    'dyscalculia_type': 'PROCEDURAL',
+    'lesson': 'DIVISION',
+    'difficulty': difficulty,
+    'num1': num1,
+    'num2': num2,
+  };
+}
+
+// NEW: Helper function to generate options for two-digit answers
+List<String> _generateTwoDigitOptions(
+    dynamic correctAnswer, String difficulty) {
+  final random = Random();
+  int correctInt = correctAnswer is int
+      ? correctAnswer
+      : int.parse(correctAnswer.toString());
+
+  // Determine range of wrong answers based on difficulty
+  int range;
+  switch (difficulty) {
+    case 'EASY':
+      range = 5;
+      break;
+    case 'MEDIUM':
+      range = 8;
+      break;
+    case 'HARD':
+      range = 12;
+      break;
+    default:
+      range = 5;
+  }
+
+  // Generate options around the correct answer
+  Set<int> optionSet = {correctInt};
+
+  // Add wrong options that are close to the correct answer
+  while (optionSet.length < 4) {
+    int wrongOption =
+        correctInt + (random.nextBool() ? 1 : -1) * (random.nextInt(range) + 1);
+
+    // Ensure wrong options are within 10-99 range (2 digits)
+    if (wrongOption >= 10 && wrongOption <= 99) {
+      optionSet.add(wrongOption);
+    }
+  }
+
+  // If we still don't have 4 options, add more within the valid range
+  while (optionSet.length < 4) {
+    int wrongOption = random.nextInt(90) + 10; // Random 2-digit number (10-99)
+    if (wrongOption != correctInt) {
+      optionSet.add(wrongOption);
+    }
+  }
+
+  return optionSet.map((e) => e.toString()).toList()..shuffle();
+}
+
+// The original helper function for generating options (unchanged)
 List<String> _generateOptions(dynamic correctAnswer, String difficulty) {
   final random = Random();
   int correctInt;
@@ -184,7 +482,7 @@ List<String> _generateOptions(dynamic correctAnswer, String difficulty) {
   return optionSet.map((e) => e.toString()).toList()..shuffle();
 }
 
-// Addition question generator
+// Original Addition question generator (unchanged)
 Map<String, dynamic> _generateAdditionQuestion(String difficulty, String type) {
   final random = Random();
   int num1, num2;
@@ -192,27 +490,58 @@ Map<String, dynamic> _generateAdditionQuestion(String difficulty, String type) {
   dynamic correctAnswer;
   List<String> options;
 
-  // Always use single-digit numbers (1-9)
-  switch (difficulty) {
-    case 'EASY':
-      num1 = random.nextInt(5) + 1; // 1-5
-      num2 = random.nextInt(5) + 1; // 1-5
-      break;
-    case 'MEDIUM':
-      num1 = random.nextInt(5) + 5; // 5-9
-      num2 = random.nextInt(5) + 1; // 1-5
-      break;
-    case 'HARD':
-      num1 = random.nextInt(4) + 6; // 6-9
-      num2 = random.nextInt(4) + 6; // 6-9
-      break;
-    default:
-      num1 = random.nextInt(9) + 1; // 1-9
-      num2 = random.nextInt(9) + 1; // 1-9
+  // Special handling for verbal questions
+  if (type == 'VERBAL') {
+    switch (difficulty) {
+      case 'EASY':
+        // For easy: numbers 1-5, sum ≤ 5
+        do {
+          num1 = random.nextInt(5) + 1; // 1-5
+          num2 = random.nextInt(5) + 1; // 1-5
+        } while (num1 + num2 > 5);
+        break;
+      case 'MEDIUM':
+        // For medium: numbers 1-9, 5 < sum < 9
+        do {
+          num1 = random.nextInt(9) + 1; // 1-9
+          num2 = random.nextInt(9) + 1; // 1-9
+        } while (num1 + num2 <= 5 || num1 + num2 >= 9);
+        break;
+      case 'HARD':
+        // For hard: numbers 5-9, 9 < sum < 20
+        do {
+          num1 = random.nextInt(5) + 5; // 5-9
+          num2 = random.nextInt(5) + 5; // 5-9
+        } while (num1 + num2 <= 9 || num1 + num2 >= 20);
+        break;
+      default:
+        num1 = random.nextInt(5) + 1;
+        num2 = random.nextInt(5) + 1;
+    }
+  } else {
+    // Original logic for non-verbal questions
+    switch (difficulty) {
+      case 'EASY':
+        num1 = random.nextInt(5) + 1; // 1-5
+        num2 = random.nextInt(5) + 1; // 1-5
+        break;
+      case 'MEDIUM':
+        num1 = random.nextInt(5) + 5; // 5-9
+        num2 = random.nextInt(5) + 1; // 1-5
+        break;
+      case 'HARD':
+        num1 = random.nextInt(4) + 6; // 6-9
+        num2 = random.nextInt(4) + 6; // 6-9
+        break;
+      default:
+        num1 = random.nextInt(9) + 1; // 1-9
+        num2 = random.nextInt(9) + 1; // 1-9
+    }
   }
 
   correctAnswer = num1 + num2;
 
+  // Rest of the function remains the same
   switch (type) {
     case 'PROCEDURAL':
       question = 'What is $num1 + $num2?';
@@ -265,7 +594,7 @@ Map<String, dynamic> _generateAdditionQuestion(String difficulty, String type) {
   };
 }
 
-// Subtraction question generator
+// Original Subtraction question generator (unchanged)
 Map<String, dynamic> _generateSubtractionQuestion(
     String difficulty, String type) {
   final random = Random();
@@ -347,7 +676,7 @@ Map<String, dynamic> _generateSubtractionQuestion(
   };
 }
 
-// Multiplication question generator
+// Original Multiplication question generator (unchanged)
 Map<String, dynamic> _generateMultiplicationQuestion(
     String difficulty, String type) {
   final random = Random();
@@ -429,7 +758,7 @@ Map<String, dynamic> _generateMultiplicationQuestion(
   };
 }
 
-// Division question generator
+// Original Division question generator (unchanged)
 Map<String, dynamic> _generateDivisionQuestion(String difficulty, String type) {
   final random = Random();
   int num1, num2, result;

@@ -48,31 +48,31 @@ class AssessmentCard extends StatelessWidget {
               onTap: isCompleted ? null : onTap,
               splashColor: isCompleted ? Colors.transparent : null,
               highlightColor: isCompleted ? Colors.transparent : null,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: isCompleted
-                            ? Colors.grey.withOpacity(0.2)
-                            : color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        isCompleted ? Icons.check_circle : icon,
-                        color: isCompleted ? Colors.grey : color,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: isCompleted
+                                ? Colors.grey.withOpacity(0.2)
+                                : color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            isCompleted ? Icons.check_circle : icon,
+                            color: isCompleted ? Colors.grey : color,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 title,
@@ -84,45 +84,51 @@ class AssessmentCard extends StatelessWidget {
                                       : const Color(0xFF1D1D1F),
                                 ),
                               ),
-                              if (isCompleted) ...[
-                                const SizedBox(width: 8),
-                                _buildCompletedLabel(),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: const Color(0xFF1D1D1F).withOpacity(
-                                isCompleted ? 0.5 : 0.6,
+                              const SizedBox(height: 4),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: const Color(0xFF1D1D1F).withOpacity(
+                                    isCompleted ? 0.5 : 0.6,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _buildInfoChip(Icons.timer_outlined, duration),
-                              const SizedBox(width: 12),
-                              _buildInfoChip(Icons.quiz_outlined, questions),
+                              const SizedBox(height: 20),
+                              Row(
+                                children: [
+                                  Icon(Icons.timer_outlined, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(duration),
+                                  const SizedBox(width: 14),
+                                  Icon(Icons.quiz_outlined, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(questions),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(
+                          isCompleted
+                              ? Icons.check_circle
+                              : Icons.arrow_forward_ios,
+                          size: isCompleted ? 20 : 16,
+                          color: isCompleted
+                              ? Colors.green
+                              : const Color(0xFF1D1D1F).withOpacity(0.3),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      isCompleted
-                          ? Icons.check_circle
-                          : Icons.arrow_forward_ios,
-                      size: isCompleted ? 20 : 16,
-                      color: isCompleted
-                          ? Colors.green
-                          : const Color(0xFF1D1D1F).withOpacity(0.3),
+                  ),
+                  if (isCompleted)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: _buildCompletedLabel(),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),

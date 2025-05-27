@@ -8,3 +8,4 @@ export './parent_assessment_section.dart';
 export './assessment_guide_sheet.dart';
 export './help_dialog.dart';
 export './complete_assessment_navigation.dart';
+export './language_selection_dialog.dart';

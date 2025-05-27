@@ -176,8 +176,9 @@ class OperationDetailScreen extends StatelessWidget {
   }
 
   Widget _buildTimeAnalysisCard() {
-    final avgTime = operationData['averageTime'] as double;
-    final timeValues = operationData['timeValues'] as List<double>;
+    final avgTime = (operationData['averageTime'] ?? 0.0) as double;
+    final List<dynamic> rawTimeValues = operationData['timeValues'] ?? [];
+    final List<double> timeValues = rawTimeValues.map((value) => (value as num).toDouble()).toList();
 
     String timeTrend = 'Stable';
     if (timeValues.length >= 2) {
@@ -278,11 +279,11 @@ class OperationDetailScreen extends StatelessWidget {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () {
-              // Navigate to operation practice screen
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) =>
-                      OperationScreen(operation: operationName),
+                  builder: (context) => OperationScreen(
+                    operation: operationName,
+                  ),
                 ),
               );
             },
@@ -345,7 +346,6 @@ class OperationDetailScreen extends StatelessWidget {
   }
 }
 
-// Operation practice screen (stub)
 class OperationScreen extends StatelessWidget {
   final String operation;
 

@@ -27,12 +27,16 @@ class SemanticSoloSessionScreen extends ConsumerStatefulWidget {
   final String index;
   final String courseName;
   final List<Map<String, dynamic>> questions;
+  final String userId;
+  final Function() onQuestionCompleted;
 
   const SemanticSoloSessionScreen({
     Key? key,
     required this.questions,
     required this.courseName,
     required this.index,
+    required this.userId,
+    required this.onQuestionCompleted,
   }) : super(key: key);
 
   @override
@@ -63,6 +67,12 @@ class _SemanticSoloSessionScreenState
 
   int _timeElapsed = 0;
   Timer? _timer;
+
+  // Define _showKeyboardInput
+  bool _showKeyboardInput = false;
+
+  // Define _answerController
+  final TextEditingController _answerController = TextEditingController();
 
   // Improved model counting
   Map<String, int> modelCounts = {
@@ -345,7 +355,9 @@ class _SemanticSoloSessionScreenState
 
   @override
   void dispose() {
-    modelCountNotifier.dispose();
+    _answerController.dispose();
+    _answerController.dispose();
+    super.dispose();
     arSessionManager!.dispose();
     _timer?.cancel();
     super.dispose();
@@ -353,7 +365,18 @@ class _SemanticSoloSessionScreenState
 
   @override
   Widget build(BuildContext context) {
-    print(widget.questions);
+    // Remove or modify this debug print
+    // print(widget.questions);  // This can cause issues if questions is null
+    
+    // Add this check
+    if (widget.questions.isEmpty) {
+      return const Scaffold(
+        body: Center(
+          child: Text('No questions available'),
+        ),
+      );
+    }
+
     final authState = ref.watch(authProvider);
     final themeData = ref.watch(themeProvider).valueOrNull ??
         const AppTheme(primaryColor: Color(0xFF4F46E5));
@@ -404,8 +427,7 @@ class _SemanticSoloSessionScreenState
     );
   }
 
-  Widget _buildControlPanel(
-      {required Color themeColor, required String userId}) {
+  Widget _buildControlPanel({required Color themeColor, required String userId}) {
     return Container(
       padding: const EdgeInsets.only(top: 8, bottom: 16),
       decoration: BoxDecoration(
@@ -437,22 +459,73 @@ class _SemanticSoloSessionScreenState
               child: Row(
                 children: [
                   if (lastTappedNode != null) _buildDeleteButton(),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildModelSelector(themeColor),
+                  const Spacer(),
+                  // Add keyboard toggle button
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _showKeyboardInput = !_showKeyboardInput;
+                      });
+                    },
+                    icon: Icon(
+                      _showKeyboardInput ? Icons.keyboard_hide : Icons.keyboard,
+                      color: themeColor,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  _buildCheckButton(themeColor, userId),
                 ],
               ),
             ),
+            if (_showKeyboardInput) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _answerController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'Enter your answer',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () => checkAnswer(userId),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: themeColor,
+                        padding: const EdgeInsets.all(16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Submit'),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildModelSelector(themeColor),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildCheckButton(themeColor, userId),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -610,248 +683,190 @@ class _SemanticSoloSessionScreenState
   }
 
   void checkAnswer(String userId) {
+    // Add null check at the beginning
+    if (widget.questions.isEmpty) {
+      print('No questions available to check');
+      return;
+    }
+
     String getQuestionKey(String index) {
-      switch (index) {
-        case '0':
-          return 'questionOne';
-        case '1':
-          return 'questionTwo';
-        case '2':
-          return 'questionThree';
-        default:
-          return index;
+      // Parse out the challenge number and question number
+      final parts = index.split('-');
+      if (parts.length == 2) {
+        switch (parts[0]) {
+          case '1':
+            return 'questionOne';
+          case '2':
+            return 'questionTwo';
+          case '3':
+            return 'questionThree';
+          default:
+            return 'questionOne';
+        }
+      } else {
+        switch (index) {
+          case '0':
+            return 'questionOne';
+          case '1':
+            return 'questionTwo';
+          case '2':
+            return 'questionThree';
+          default:
+            return index;
+        }
       }
     }
 
-    if (widget.courseName == 'Addition') {
-      final appleCount = modelCounts['Apple'] ?? 0;
-      final orangeCount = modelCounts['Orange'] ?? 0;
-      final isCorrect = appleCount == widget.questions[0]['num1'] &&
-          orangeCount == widget.questions[0]['num2'];
-
-      showDialog(
-        context: context,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  size: 64,
-                  color: Colors.green,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Submit Answer',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    _cleanUpARResources();
-                    if (isCorrect) {
-                      // Save progress to Firestore
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .collection(getQuestionKey(widget.index))
-                          .doc('status')
-                          .set({
-                            'completed': true,
-                            'isCorrect': isCorrect,
-                            'timestamp': FieldValue.serverTimestamp(),
-                            'timeElapsed': _timeElapsed,
-                          }, SetOptions(merge: true))
-                          .then((_) => print('Progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save progress: $error'));
-                    } else {
-                      // Save progress to Firestore
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .collection(getQuestionKey(widget.index))
-                          .doc('status')
-                          .set({
-                            'completed': true,
-                            'isCorrect': isCorrect,
-                            'timestamp': FieldValue.serverTimestamp(),
-                            'timeElapsed': _timeElapsed,
-                          }, SetOptions(merge: true))
-                          .then((_) => print('Progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save progress: $error'));
-                    }
-                    // If this is the last question (index 2), also update the overall progress
-                    if (widget.index == '2') {
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .set({
-                            'completed': true,
-                            'timestamp': FieldValue.serverTimestamp(),
-                          }, SetOptions(merge: true))
-                          .then((_) =>
-                              print('Overall progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save overall progress: $error'));
-                    }
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Great Job!'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+    bool isCorrect = false;
+    
+    if (_showKeyboardInput) {
+      // Handle keyboard input with null safety
+      final userAnswer = int.tryParse(_answerController.text);
+      final question = widget.questions[0];
+      
+      if (userAnswer != null && question != null) {
+        if (widget.courseName == 'Addition') {
+          final num1 = question['num1'] as int? ?? 0;
+          final num2 = question['num2'] as int? ?? 0;
+          final expectedSum = num1 + num2;
+          isCorrect = userAnswer == expectedSum;
+        } else {
+          final expectedCount = int.tryParse(question['correctAnswer']?.toString() ?? '0') ?? 0;
+          isCorrect = userAnswer == expectedCount;
+        }
+      }
     } else {
-      final appleCount = modelCounts['Apple'] ?? 0;
-      final int expectedCount =
-          int.parse(widget.questions[0]['correctAnswer'].toString());
-      final int actualCount = appleCount;
-      final bool isCorrect = actualCount == expectedCount;
+      // Handle AR counting with null safety
+      final question = widget.questions[0];
+      if (question != null) {
+        if (widget.courseName == 'Addition') {
+          final appleCount = modelCounts['Apple'] ?? 0;
+          final orangeCount = modelCounts['Orange'] ?? 0;
+          final num1 = question['num1'] as int? ?? 0;
+          final num2 = question['num2'] as int? ?? 0;
+          isCorrect = appleCount == num1 && orangeCount == num2;
+        } else {
+          final appleCount = modelCounts['Apple'] ?? 0;
+          final expectedCount = int.tryParse(question['correctAnswer']?.toString() ?? '0') ?? 0;
+          isCorrect = appleCount == expectedCount;
+        }
+      }
+    }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.check_circle,
-                  size: 64,
-                  color: Colors.green,
+    // Show result dialog and handle Firebase updates
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isCorrect ? 'Completed' : 'Completed',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Submit Answer',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    _cleanUpARResources();
-                    if (isCorrect) {
-                      // Save progress to Firestore
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .collection(getQuestionKey(widget.index))
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () async {
+                  // Always save progress regardless of correct/incorrect
+                  _cleanUpARResources();
+                  
+                  // Extract challenge and question numbers from the index
+                  final parts = widget.index.split('-');
+                  final challengeNumber = parts[0];
+                  final questionNumber = parts[1];
+                  
+                  final questionKey = getQuestionKey(widget.index);
+                  
+                  try {
+                    // Get a reference to the base path
+                    final baseRef = FirebaseFirestore.instance
+                        .collection('functionActivities')
+                        .doc(userId)
+                        .collection(widget.courseName)
+                        .doc('Semantic Dyscalculia')
+                        .collection('solo_sessions')
+                        .doc('progress');
+
+                    // Save individual question progress
+                    await baseRef
+                        .collection(questionKey)
+                        .doc('status')
+                        .collection('questionDetails')
+                        .doc('question-$questionNumber')
+                        .set({
+                          'completed': true,
+                          'isCorrect': isCorrect,
+                          'timestamp': FieldValue.serverTimestamp(),
+                          'timeElapsed': _timeElapsed,
+                        }, SetOptions(merge: true));
+
+                    // If this is question 9 (the last question), mark the challenge as completed
+                    if (int.parse(questionNumber) == 9) {
+                      await baseRef
+                          .collection(questionKey)
                           .doc('status')
                           .set({
                             'completed': true,
-                            'isCorrect': isCorrect,
-                            'timestamp': FieldValue.serverTimestamp(),
-                            'timeElapsed': _timeElapsed,
-                          }, SetOptions(merge: true))
-                          .then((_) => print('Progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save progress: $error'));
-                    } else {
-                      // Save progress to Firestore
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .collection(getQuestionKey(widget.index))
-                          .doc('status')
-                          .set({
-                            'completed': true,
-                            'isCorrect': isCorrect,
-                            'timestamp': FieldValue.serverTimestamp(),
-                            'timeElapsed': _timeElapsed,
-                          }, SetOptions(merge: true))
-                          .then((_) => print('Progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save progress: $error'));
+                            'completedAt': FieldValue.serverTimestamp(),
+                            'challengeNumber': challengeNumber,
+                          }, SetOptions(merge: true));
+
+                      // Check if all challenges are completed
+                      final challengesStatus = await Future.wait([
+                        baseRef.collection('questionOne').doc('status').get(),
+                        baseRef.collection('questionTwo').doc('status').get(),
+                        baseRef.collection('questionThree').doc('status').get(),
+                      ]);
+
+                      final allChallengesCompleted = challengesStatus.every(
+                        (doc) => doc.exists && doc.data()?['completed'] == true
+                      );
+
+                      // If all challenges are completed, update the progress document
+                      if (allChallengesCompleted) {
+                        await baseRef.set({
+                          'completed': true,
+                          'timeElapsed': _timeElapsed,
+                        }, SetOptions(merge: true));
+                      }
                     }
-                    // If this is the last question (index 2), also update the overall progress
-                    if (widget.index == '2') {
-                      FirebaseFirestore.instance
-                          .collection('functionActivities')
-                          .doc(userId)
-                          .collection(widget.courseName)
-                          .doc('Semantic Dyscalculia')
-                          .collection('solo_sessions')
-                          .doc('progress')
-                          .set({
-                            'completed': true,
-                            'timestamp': FieldValue.serverTimestamp(),
-                          }, SetOptions(merge: true))
-                          .then((_) =>
-                              print('Overall progress saved to Firestore'))
-                          .catchError((error) =>
-                              print('Failed to save overall progress: $error'));
-                    }
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+
+                  } catch (error) {
+                    print('Error saving progress: $error');
+                  }
+
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Return to previous screen
+
+                  if (_showKeyboardInput) {
+                    _answerController.clear();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isCorrect ? Colors.blue : Colors.blue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('Great Job!'),
                 ),
-              ],
-            ),
+                child: const Text('Continue'),
+              ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
   }
 
   // Gesture handlers

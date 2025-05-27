@@ -25,6 +25,10 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  final _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+  final _nameRegex = RegExp(r'^[a-zA-Z\s]{2,50}$');
+  final _passwordRegex = RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$');
+
   @override
   void initState() {
     super.initState();
@@ -137,9 +141,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
           ),
           child: Center(
             child: Image.asset(
-              'assets/images/app_logo.png', // Replace with your actual logo path
-              width: 80,
-              height: 80,
+              'assets/images/booze.png', // Replace with your actual logo path
+              width: 130,
+              height: 130,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return const Icon(
@@ -204,8 +208,17 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
               const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
         validator: (value) {
-          if (value?.isEmpty ?? true) {
+          if (value == null || value.isEmpty) {
             return 'Please enter your name';
+          }
+          if (value.length < 2) {
+            return 'Name must be at least 2 characters';
+          }
+          if (value.length > 50) {
+            return 'Name must be less than 50 characters';
+          }
+          if (!_nameRegex.hasMatch(value)) {
+            return 'Name can only contain letters and spaces';
           }
           return null;
         },
@@ -242,9 +255,15 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
-        validator: (value) => value?.isEmpty == true || !value!.contains('@')
-            ? 'Please enter a valid email'
-            : null,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter an email address';
+          }
+          if (!_emailRegex.hasMatch(value)) {
+            return 'Please enter a valid email address';
+          }
+          return null;
+        },
         keyboardType: TextInputType.emailAddress,
       ),
     );
@@ -291,9 +310,18 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
-        validator: (value) => value?.isEmpty == true || value!.length < 6
-            ? 'Password must be at least 6 characters'
-            : null,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter a password';
+          }
+          if (value.length < 8) {
+            return 'Password must be at least 8 characters';
+          }
+          if (!_passwordRegex.hasMatch(value)) {
+            return 'Password must contain at least:\n• One letter\n• One number\n• One special character';
+          }
+          return null;
+        },
       ),
     );
   }
@@ -342,6 +370,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
               const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
         validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please confirm your password';
+          }
           if (value != _passwordController.text) {
             return 'Passwords do not match';
           }
@@ -355,11 +386,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
     return Container(
       height: 60,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [themeColor, const Color(0xFF30D158)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        color: themeColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -452,9 +479,9 @@ class _SignUpPageState extends ConsumerState<SignUpPage>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
-                  'assets/images/google_logo.png', // Replace with your actual Google logo path
-                  width: 24,
-                  height: 24,
+                  'assets/images/google.png', // Replace with your actual Google logo path
+                  width: 20,
+                  height: 20,
                   errorBuilder: (context, error, stackTrace) {
                     return const Icon(
                       Icons.g_mobiledata,

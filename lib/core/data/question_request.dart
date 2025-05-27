@@ -12,28 +12,6 @@ final questionRequests = [
   {
     'dyscalculia_type': 'PROCEDURAL',
     'lesson': 'MULTIPLICATION',
-    'difficulty': 'EASY',
-  },
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'DIVISION',
-    'difficulty': 'EASY',
-  },
-
-  //procedural medium
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'ADDITION',
-    'difficulty': 'MEDIUM',
-  },
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'SUBTRACTION',
-    'difficulty': 'MEDIUM',
-  },
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'MULTIPLICATION',
     'difficulty': 'MEDIUM',
   },
   {
@@ -41,8 +19,6 @@ final questionRequests = [
     'lesson': 'DIVISION',
     'difficulty': 'MEDIUM',
   },
-
-  //procedural hard
   {
     'dyscalculia_type': 'PROCEDURAL',
     'lesson': 'ADDITION',
@@ -53,36 +29,11 @@ final questionRequests = [
     'lesson': 'SUBTRACTION',
     'difficulty': 'HARD',
   },
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'MULTIPLICATION',
-    'difficulty': 'HARD',
-  },
-  {
-    'dyscalculia_type': 'PROCEDURAL',
-    'lesson': 'DIVISION',
-    'difficulty': 'HARD',
-  },
 
-  //semantic easy
+  // Semantic - 8 questions
   {
     'dyscalculia_type': 'SEMANTIC',
     'lesson': 'ADDITION',
-    'difficulty': 'EASY',
-  },
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'SUBTRACTION',
-    'difficulty': 'EASY',
-  },
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'MULTIPLICATION',
-    'difficulty': 'EASY',
-  },
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'DIVISION',
     'difficulty': 'EASY',
   },
   {
@@ -94,18 +45,6 @@ final questionRequests = [
     'dyscalculia_type': 'SEMANTIC',
     'lesson': 'COMPARISON',
     'difficulty': 'EASY',
-  },
-
-  //semantic medium
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'ADDITION',
-    'difficulty': 'MEDIUM',
-  },
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'SUBTRACTION',
-    'difficulty': 'MEDIUM',
   },
   {
     'dyscalculia_type': 'SEMANTIC',
@@ -122,13 +61,6 @@ final questionRequests = [
     'lesson': 'ODDEVEN',
     'difficulty': 'MEDIUM',
   },
-  {
-    'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'DAYS',
-    'difficulty': 'MEDIUM',
-  },
-
-  //semantic hard
   {
     'dyscalculia_type': 'SEMANTIC',
     'lesson': 'FRACTION',
@@ -136,27 +68,15 @@ final questionRequests = [
   },
   {
     'dyscalculia_type': 'SEMANTIC',
-    'lesson': 'MONTHS',
-    'difficulty': 'HARD',
-  },
-  {
-    'dyscalculia_type': 'SEMANTIC',
     'lesson': 'DAYS',
     'difficulty': 'HARD',
   },
 
-  //verbal easy
+  // Verbal - 4 questions
   {
     'dyscalculia_type': 'VERBAL',
     'lesson': 'NUMBERS',
     'difficulty': 'EASY',
-  },
-
-  //verbal medium
-  {
-    'dyscalculia_type': 'VERBAL',
-    'lesson': 'NUMBERS',
-    'difficulty': 'MEDIUM',
   },
   {
     'dyscalculia_type': 'VERBAL',
@@ -165,16 +85,9 @@ final questionRequests = [
   },
   {
     'dyscalculia_type': 'VERBAL',
-    'lesson': 'ODDEVEN',
-    'difficulty': 'MEDIUM',
-  },
-  {
-    'dyscalculia_type': 'VERBAL',
     'lesson': 'TIME',
     'difficulty': 'MEDIUM',
   },
-
-  //verbal hard
   {
     'dyscalculia_type': 'VERBAL',
     'lesson': 'MATHWORDS',

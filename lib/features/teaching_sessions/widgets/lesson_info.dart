@@ -1,22 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
-class LessonInfo extends StatefulWidget {
+class LessonInfo extends StatelessWidget {
   final String dyscalculiaType;
   final String courseName;
   final double concentrationScore;
+  final VideoPlayerController? videoController;
 
   const LessonInfo({
     Key? key,
     required this.dyscalculiaType,
     required this.courseName,
     required this.concentrationScore,
+    required this.videoController,
   }) : super(key: key);
 
-  @override
-  _LessonInfoState createState() => _LessonInfoState();
-}
-
-class _LessonInfoState extends State<LessonInfo> {
   @override
   Widget build(BuildContext context) {
     return _buildLessonInfo();
@@ -48,17 +46,36 @@ class _LessonInfoState extends State<LessonInfo> {
             ),
           ),
           const SizedBox(height: 15),
-          _buildInfoRow(Icons.category, 'Type', widget.dyscalculiaType),
+          _buildInfoRow(Icons.category, 'Type', dyscalculiaType),
           const SizedBox(height: 10),
-          _buildInfoRow(Icons.book, 'Course', widget.courseName),
+          _buildInfoRow(Icons.book, 'Course', courseName),
           const SizedBox(height: 10),
-          _buildInfoRow(Icons.access_time, 'Duration', '15 minutes'),
+          _buildInfoRow(Icons.access_time, 'Duration', _formatVideoDuration()),
           const SizedBox(height: 10),
           _buildInfoRow(Icons.show_chart, 'Average Focus',
-              '${(widget.concentrationScore * 100).toStringAsFixed(1)}%'),
+              '${(concentrationScore * 100).toStringAsFixed(1)}%'),
         ],
       ),
     );
+  }
+
+  String _formatVideoDuration() {
+    if (videoController == null || !videoController!.value.isInitialized) {
+      return 'Loading...';
+    }
+
+    final Duration duration = videoController!.value.duration;
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+
+    if (duration.inHours > 0) {
+      final hours = twoDigits(duration.inHours);
+      return '$hours:$minutes:$seconds';
+    } else {
+      return '$minutes:$seconds';
+    }
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {

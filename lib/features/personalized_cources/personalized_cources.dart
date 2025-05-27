@@ -32,9 +32,9 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
 
   Map<String, bool> unlockedOperations = {
     'Addition': true,
-    'Subtraction': false,
-    'Multiplication': false,
-    'Division': false,
+    'Subtraction': true,
+    'Multiplication': true,
+    'Division': true,
   };
 
   Map<String, bool> completedOperations = {
@@ -242,7 +242,7 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                               crossAxisCount: 2,
                               mainAxisSpacing: 20,
                               crossAxisSpacing: 20,
-                              childAspectRatio: 0.85,
+                              childAspectRatio: 0.75, // Changed from 0.85 to 0.75 to make cards taller
                             ),
                             itemCount: mathOperations.length,
                             itemBuilder: (context, index) {
@@ -334,12 +334,12 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
           child: Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16), // Reduced from 20 to 16
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10), // Reduced from 12 to 10
                       decoration: BoxDecoration(
                         color: isUnlocked
                             ? baseColor.withOpacity(0.1)
@@ -349,26 +349,26 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                       child: Icon(
                         course['icon'],
                         color: isUnlocked ? baseColor : Colors.grey.shade400,
-                        size: 32,
+                        size: 28, // Reduced from 32 to 28
                       ),
                     ),
-                    const Spacer(),
+                    const Spacer(flex: 1),
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18, // Reduced from 20 to 18
                         fontWeight: FontWeight.bold,
                         color: isUnlocked
                             ? const Color(0xFF1D1D1F)
                             : Colors.grey.shade400,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       course['subtitle'],
                       style: TextStyle(
-                        fontSize: 14,
-                        height: 1.3,
+                        fontSize: 12,
+                        height: 1.2,
                         color: isUnlocked
                             ? const Color(0xFF1D1D1F).withOpacity(0.6)
                             : Colors.grey.shade400,
@@ -376,50 +376,57 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       "${questionsByOperation[title]?.length ?? 0} questions",
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: isUnlocked
                             ? Colors.grey.shade600
                             : Colors.grey.shade400,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text(
-                          isCompleted
-                              ? 'Completed'
-                              : isUnlocked
-                                  ? 'Start Learning'
-                                  : 'Locked',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                    const Spacer(flex: 1),
+                    // Added more space at the bottom
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isCompleted
+                                  ? 'Completed'
+                                  : isUnlocked
+                                      ? 'Start Learning'
+                                      : 'Locked',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isCompleted
+                                    ? Colors.green
+                                    : isUnlocked
+                                        ? baseColor
+                                        : Colors.grey.shade400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(
+                            isCompleted
+                                ? Icons.check_circle
+                                : isUnlocked
+                                    ? Icons.arrow_forward
+                                    : Icons.lock,
                             color: isCompleted
                                 ? Colors.green
                                 : isUnlocked
                                     ? baseColor
                                     : Colors.grey.shade400,
+                            size: 18,
                           ),
-                        ),
-                        const Spacer(),
-                        Icon(
-                          isCompleted
-                              ? Icons.check_circle
-                              : isUnlocked
-                                  ? Icons.arrow_forward
-                                  : Icons.lock,
-                          color: isCompleted
-                              ? Colors.green
-                              : isUnlocked
-                                  ? baseColor
-                                  : Colors.grey.shade400,
-                          size: 20,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -448,8 +455,8 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                         Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              vertical: 12,
-                              horizontal: 20,
+                              vertical: 10,
+                              horizontal: 18,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.black.withOpacity(0.6),
@@ -461,14 +468,14 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                                 Icon(
                                   Icons.lock_outline,
                                   color: Colors.white,
-                                  size: 24,
+                                  size: 22,
                                 ),
-                                SizedBox(width: 8),
+                                SizedBox(width: 6),
                                 Text(
                                   "Locked",
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -486,7 +493,7 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                   right: 10,
                   child: Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(20),
@@ -497,14 +504,14 @@ class _PersonalizedCoursesState extends ConsumerState<PersonalizedCourses>
                         Icon(
                           Icons.check,
                           color: Colors.white,
-                          size: 16,
+                          size: 14,
                         ),
-                        SizedBox(width: 4),
+                        SizedBox(width: 3),
                         Text(
                           "Completed",
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

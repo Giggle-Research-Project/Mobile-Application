@@ -5,7 +5,9 @@ import 'package:giggle/core/providers/theme_provider.dart';
 import 'package:giggle/features/auth/signup/signup.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+  final String? initialError;
+
+  const LoginPage({super.key, this.initialError});
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -36,6 +38,18 @@ class _LoginPageState extends ConsumerState<LoginPage>
       ),
     );
     _animationController.forward();
+
+    // Show initial error if present
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.initialError != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.initialError!),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -170,9 +184,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
           ),
           child: Center(
             child: Image.asset(
-              'assets/images/app_logo.png', // Replace with your actual logo path
-              width: 80,
-              height: 80,
+              'assets/images/booze.png', // Replace with your actual logo path
+              width: 140,
+              height: 140,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
                 return const Icon(
@@ -316,11 +330,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
     return Container(
       height: 60,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [themeColor, const Color(0xFF30D158)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        color: themeColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -424,9 +434,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset(
-                        'assets/images/google_logo.png', // Replace with your actual Google logo path
-                        width: 24,
-                        height: 24,
+                        'assets/images/google.png', // Replace with your actual Google logo path
+                        width: 20,
+                        height: 20,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(
                             Icons.g_mobiledata,

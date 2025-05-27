@@ -101,7 +101,12 @@ class _VoiceEmotionDetectorState extends State<VoiceEmotionDetector> {
       if (path != null) {
         await PredictVoiceEmotionService().predictEmotion(
           File(path),
-          widget.onEmotionDetected,
+          (emotion) {
+            widget.onEmotionDetected(emotion);
+            setState(() {
+              _currentEmotion = emotion;
+            });
+          },
           mounted,
           setState,
           _currentEmotion,

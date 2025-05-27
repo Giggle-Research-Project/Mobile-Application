@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,7 +31,7 @@ class ProceduralSoloSession extends ConsumerStatefulWidget {
     required this.dyscalculiaType,
     required this.courseName,
     required this.questions,
-    required this.index,
+    required this.index, required Future<Null> Function(bool isCorrect) onQuestionCompleted, required String userId,
   }) : super(key: key);
 
   @override
@@ -67,8 +68,6 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
   @override
   void initState() {
     super.initState();
-    print('Questions length: ${widget.questions.length}');
-    print('Questions data: ${widget.questions}');
     _startTimer();
     _loadQuestion();
     _initializeSquares();
@@ -76,50 +75,52 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
 
   void _loadQuestion() {
     try {
-      print('Starting _loadQuestion');
       if (widget.questions.isEmpty) {
-        print('Error: questions list is empty');
-        _setDefaultQuestion();
-        return;
-      }
-
-      print('Current question index: $_currentQuestionIndex');
-      print('Questions length: ${widget.questions.length}');
-
-      if (_currentQuestionIndex >= widget.questions.length) {
-        print('Error: currentQuestionIndex out of bounds');
         _setDefaultQuestion();
         return;
       }
 
       final questionData = widget.questions[_currentQuestionIndex];
-      print('Question data: $questionData');
+      final difficulty = questionData['difficulty']?.toString() ?? 'medium';
 
-      if (!questionData.containsKey('num1') ||
-          !questionData.containsKey('num2')) {
-        print('Error: question missing required keys');
-        _setDefaultQuestion();
-        return;
+      Map<String, int> numbers;
+      switch (widget.courseName.toLowerCase()) {
+        case 'addition':
+          numbers = NumberRangeGenerator.generateAdditionNumbers(difficulty);
+          break;
+        case 'subtraction':
+          numbers = NumberRangeGenerator.generateSubtractionNumbers(difficulty);
+          break;
+        case 'multiplication':
+          numbers = NumberRangeGenerator.generateMultiplicationNumbers(difficulty);
+          break;
+        case 'division':
+          numbers = NumberRangeGenerator.generateDivisionNumbers(difficulty);
+          break;
+        default:
+          numbers = {'num1': 5, 'num2': 3};
       }
 
-      // Extract values
-      final num1 = questionData['num1'];
-      final num2 = questionData['num2'];
-      print('Extracted values: num1=$num1, num2=$num2');
+      firstNumber = numbers['num1']!;
+      secondNumber = numbers['num2']!;
 
-      // Validate data types
-      if (num1 is! int || num2 is! int) {
-        print('Error: num1 or num2 is not an integer');
-        _setDefaultQuestion();
-        return;
+      // Calculate correct answer based on operation
+      switch (widget.courseName.toLowerCase()) {
+        case 'addition':
+          correctAnswer = firstNumber + secondNumber;
+          break;
+        case 'subtraction':
+          correctAnswer = firstNumber - secondNumber;
+          break;
+        case 'multiplication':
+          correctAnswer = firstNumber * secondNumber;
+          break;
+        case 'division':
+          correctAnswer = firstNumber ~/ secondNumber;
+          break;
+        default:
+          correctAnswer = firstNumber + secondNumber;
       }
-
-      // Set the current question data
-      firstNumber = num1;
-      secondNumber = num2;
-      correctAnswer = firstNumber + secondNumber;
-
-      print('Loaded question: $firstNumber + $secondNumber = $correctAnswer');
 
       // Reset validation state
       validationResults = {
@@ -132,7 +133,6 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
       };
     } catch (e) {
       print('Error in _loadQuestion: $e');
-      print('Stack trace: ${StackTrace.current}');
       _setDefaultQuestion();
     }
   }
@@ -433,12 +433,15 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
       await FirebaseFirestore.instance
           .collection('functionActivities')
           .doc(userId)
-          .collection('Addition')
-          .doc('Procedural')
+          .collection(widget.courseName)
+          .doc('Procedural Dyscalculia')
+          .collection('solo_sessions')
+          .doc('progress')
           .set({
-        'completed': true,
-        'timestamp': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'completed': true,
+            'timestamp': FieldValue.serverTimestamp(),
+            'timeTaken': _timeElapsed,
+          }, SetOptions(merge: true));
 
       print('Progress saved to Firestore');
     } catch (e) {
@@ -654,18 +657,34 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
     }
   }
 
-  void _showSubmitResultDialog(int timeTaken, String userId,
-      bool isOperandCorrect, bool isAnswerCorrect) {
+  void _showSubmitResultDialog(int timeTaken, String userId, bool isOperandCorrect, bool isAnswerCorrect) {
     String getQuestionKey(String index) {
-      switch (index) {
-        case '0':
-          return 'questionOne';
-        case '1':
-          return 'questionTwo';
-        case '2':
-          return 'questionThree';
-        default:
-          return index;
+      // Parse out the challenge number and question number
+      final parts = index.split('-');
+      if (parts.length == 2) {
+        // For challenge-specific questions (e.g., "1-0")
+        switch (parts[0]) {
+          case '1':
+            return 'questionOne';
+          case '2':
+            return 'questionTwo';
+          case '3':
+            return 'questionThree';
+          default:
+            return 'questionOne';
+        }
+      } else {
+        // For legacy format
+        switch (index) {
+          case '0':
+            return 'questionOne';
+          case '1':
+            return 'questionTwo';
+          case '2':
+            return 'questionThree';
+          default:
+            return index;
+        }
       }
     }
 
@@ -690,42 +709,82 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
           actions: [
             TextButton(
               onPressed: () async {
-                // Save progress to Firestore
-                await FirebaseFirestore.instance
-                    .collection('functionActivities')
-                    .doc(userId)
-                    .collection(widget.courseName)
-                    .doc('Procedural Dyscalculia')
-                    .collection('solo_sessions')
-                    .doc('progress')
-                    .collection(getQuestionKey(widget.index))
-                    .doc('status')
-                    .set({
-                  'completed': true,
-                  'isCorrect': isOperandCorrect && isAnswerCorrect,
-                  'timeTaken': _timeElapsed,
-                }, SetOptions(merge: true));
+                try {
+                  final parts = widget.index.split('-');
+                  final challengeNumber = parts[0];
+                  final questionNumber = parts[1];
+                  final questionKey = getQuestionKey(widget.index);
 
-                if (widget.index == '2') {
-                  FirebaseFirestore.instance
+                  // Get reference to base path
+                  final baseRef = FirebaseFirestore.instance
                       .collection('functionActivities')
                       .doc(userId)
                       .collection(widget.courseName)
                       .doc('Procedural Dyscalculia')
                       .collection('solo_sessions')
-                      .doc('progress')
+                      .doc('progress');
+
+                  // Save individual question progress
+                  await baseRef
+                      .collection(questionKey)
+                      .doc('status')
+                      .collection('questionDetails')
+                      .doc('question-$questionNumber')
                       .set({
                         'completed': true,
                         'isCorrect': isOperandCorrect && isAnswerCorrect,
                         'timeTaken': _timeElapsed,
-                      }, SetOptions(merge: true))
-                      .then((_) => print('Progress saved to Firestore'))
-                      .catchError(
-                          (error) => print('Failed to save progress: $error'));
-                }
+                        'timestamp': FieldValue.serverTimestamp(),
+                      }, SetOptions(merge: true));
 
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
+                  // If this is question 9, mark the challenge as completed
+                  if (int.parse(questionNumber) == 9) {
+                    await baseRef
+                        .collection(questionKey)
+                        .doc('status')
+                        .set({
+                          'completed': true,
+                          'completedAt': FieldValue.serverTimestamp(),
+                          'challengeNumber': challengeNumber,
+                        }, SetOptions(merge: true));
+
+                    // Check if all challenges are completed
+                    final challenge1Status = await baseRef
+                        .collection('questionOne')
+                        .doc('status')
+                        .get();
+                    
+                    final challenge2Status = await baseRef
+                        .collection('questionTwo')
+                        .doc('status')
+                        .get();
+                    
+                    final challenge3Status = await baseRef
+                        .collection('questionThree')
+                        .doc('status')
+                        .get();
+
+                    // If all challenges are completed, update the progress document
+                    if (challenge1Status.exists && 
+                        challenge2Status.exists && 
+                        challenge3Status.exists) {
+                      await baseRef.set({
+                        'completed': true,
+                        'timeElapsed': _timeElapsed,
+                      }, SetOptions(merge: true));
+                    }
+                  }
+
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  }
+                } catch (error) {
+                  print('Error saving progress: $error');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to save progress')),
+                  );
+                }
               },
               child: const Text('Continue'),
             ),
@@ -756,6 +815,41 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
         ],
       ),
     );
+  }
+
+  // Add these methods after the state class declaration
+  String _getDifficultyText() {
+    // Get difficulty from the question if available
+    final difficulty = widget.questions[0]['difficulty']?.toString().toLowerCase() ?? 'normal';
+    
+    // Map difficulty to display text
+    switch (difficulty) {
+      case 'easy':
+        return 'Easy';
+      case 'medium':
+        return 'Medium';
+      case 'hard':
+        return 'Hard';
+      default:
+        return 'Normal';
+    }
+  }
+
+  Color _getDifficultyColor() {
+    // Get difficulty from the question if available
+    final difficulty = widget.questions[0]['difficulty']?.toString().toLowerCase() ?? 'normal';
+    
+    // Map difficulty to colors
+    switch (difficulty) {
+      case 'easy':
+        return Colors.green;
+      case 'medium':
+        return Colors.orange;
+      case 'hard':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
   }
 
   @override
@@ -831,96 +925,120 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
   }
 
   Widget _buildBottomButtons(Color themeColor, String userId) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _clearAllWriting,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Row(
+      children: [
+        // Clear All Button
+        Expanded(
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _clearAllWriting,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              label: const Text(
-                'Clear All',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            label: const Text(
+              'Clear All',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: _isPredicting
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ))
-                  : const Icon(Icons.precision_manufacturing,
-                      color: Colors.white),
-              onPressed: _isPredicting ? null : _predictAllDigits,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.purple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+        ),
+        const SizedBox(width: 16),
+        // Check Answer Button
+        Expanded(
+          flex: 2,
+          child: ElevatedButton.icon(
+            icon: _isPredicting 
+              ? SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : const Icon(Icons.check_circle, color: Colors.white),
+            onPressed: _isPredicting ? null : () => _checkAnswer(userId),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: themeColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              label: Text(
-                _isPredicting ? 'Predicting...' : 'Predict Digits',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            label: Text(
+              _isPredicting ? 'Submitting...' : 'Submit Answer',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.check_circle, color: Colors.white),
-              onPressed: _predictedDigits.isNotEmpty && !_isSubmitted
-                  ? () => _submitAnswer(userId)
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _predictedDigits.isNotEmpty && !_isSubmitted
-                    ? themeColor
-                    : Colors.grey,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              label: Text(
-                'Submit',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
+// Update the _checkAnswer method to ensure loading state is shown correctly
+Future<void> _checkAnswer(String userId) async {
+  if (_isPredicting) return;
+
+  setState(() {
+    _isPredicting = true;
+  });
+
+  try {
+    // Predict all digits first
+    final firstDigit = await captureAndPredictDigit(_firstDigitKey, 'first_digit');
+    final secondDigit = await captureAndPredictDigit(_secondDigitKey, 'second_digit');
+    final thirdDigit = await captureAndPredictDigit(_thirdDigitKey, 'third_digit');
+    final fourthDigit = await captureAndPredictDigit(_fourthDigitKey, 'fourth_digit');
+    final answerFirstDigit = await captureAndPredictDigit(_answerFirstDigitKey, 'answer_first_digit');
+    final answerSecondDigit = await captureAndPredictDigit(_answerSecondDigitKey, 'answer_second_digit');
+
+    if (!mounted) return;
+
+    setState(() {
+      _predictedDigits = {
+        'first_digit': firstDigit ?? 'N/A',
+        'second_digit': secondDigit ?? 'N/A',
+        'third_digit': thirdDigit ?? 'N/A',
+        'fourth_digit': fourthDigit ?? 'N/A',
+        'answer_first_digit': answerFirstDigit ?? 'N/A',
+        'answer_second_digit': answerSecondDigit ?? 'N/A',
+      };
+    });
+
+    // Now submit the answer
+    _submitAnswer(userId);
+  } catch (e) {
+    print('Error checking answer: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Prediction failed. Please try again.')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isPredicting = false;
+      });
+    }
+  }
+}
   Widget _buildProgressIndicator() {
     final totalQuestions = widget.questions.length;
-    final currentQuestion = _currentQuestionIndex + 1;
+    final currentQuestion = _timeElapsed + 1;
 
     final minutes = _timeElapsed ~/ 60;
     final seconds = _timeElapsed % 60;
@@ -932,11 +1050,12 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Question $currentQuestion of $totalQuestions',
-                style: const TextStyle(
+              const Text(
+                '',
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               Text(
@@ -973,66 +1092,104 @@ class _ProceduralSoloSessionState extends ConsumerState<ProceduralSoloSession> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blue.withOpacity(0.3)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Text(
-              'Question ${_currentQuestionIndex + 1}:',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Question ${_currentQuestionIndex + 1}:',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (widget.courseName == 'Addition')
+                  Text(
+                    'Solve the addition problem: $firstNumber + $secondNumber = ?',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                if (widget.courseName == 'Subtraction')
+                  if (firstNumber < secondNumber)
+                    Text(
+                      'Solve the subtraction problem: $secondNumber - $firstNumber = ?',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                if (widget.courseName == 'Subtraction')
+                  if (firstNumber > secondNumber)
+                    Text(
+                      'Solve the subtraction problem: $firstNumber - $secondNumber = ?',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                if (widget.courseName == 'Multiplication')
+                  Text(
+                    'Solve the multiplication problem: $firstNumber x $secondNumber = ?',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                if (widget.courseName == 'Division')
+                  Text(
+                    'Solve the division problem: $firstNumber ÷ $secondNumber = ?',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Write your answer in the boxes below.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            if (widget.courseName == 'Addition')
-              Text(
-                'Solve the addition problem: $firstNumber + $secondNumber = ?',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            if (widget.courseName == 'Subtraction')
-              if (firstNumber < secondNumber)
-                Text(
-                  'Solve the subtraction problem: $secondNumber - $firstNumber = ?',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _getDifficultyColor().withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _getDifficultyColor().withOpacity(0.5),
+                    width: 1,
                   ),
                 ),
-            if (widget.courseName == 'Subtraction')
-              if (firstNumber > secondNumber)
-                Text(
-                  'Solve the subtraction problem: $firstNumber - $secondNumber = ?',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.track_changes,
+                      size: 14,
+                      color: _getDifficultyColor(),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getDifficultyText(),
+                      style: TextStyle(
+                        color: _getDifficultyColor(),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-            if (widget.courseName == 'Multiplication')
-              Text(
-                'Solve the multiplication problem: $firstNumber x $secondNumber = ?',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            if (widget.courseName == 'Division')
-              Text(
-                'Solve the division problem: $firstNumber ÷ $secondNumber = ?',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            const SizedBox(height: 4),
-            const Text(
-              'Write your answer in the boxes below.',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
               ),
             ),
           ],
@@ -1343,5 +1500,116 @@ class PredictionResultsDialog extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+// Add this helper class at the top of the file
+class NumberRangeGenerator {
+  static Map<String, int> generateAdditionNumbers(String difficulty) {
+    final random = Random();
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        // 1-digit numbers with sum not exceeding 9
+        final num1 = random.nextInt(8) + 1; // 1-8
+        final num2 = random.nextInt(9 - num1) + 1; // ensures sum <= 9
+        return {'num1': num1, 'num2': num2};
+        
+      case 'medium':
+        // 2-digit numbers without borrowing, sum between 10-99
+        final num1 = random.nextInt(90) + 10; // 10-99
+        final maxNum2 = 99 - num1; // ensure sum <= 99
+        final num2 = random.nextInt(maxNum2) + 1;
+        return {'num1': num1, 'num2': num2};
+        
+      case 'hard':
+        // 2-digit numbers between 50-90 with same digits, ensuring sum < 90
+        final baseDigit = random.nextInt(4) + 1; // 1-4 (to keep sum < 90)
+        final num1 = baseDigit * 11; // creates numbers like 11,22,33,44
+        // Calculate maximum allowed second number to keep sum < 90
+        final maxSecondNum = ((89 - num1) ~/ 11) + 1;
+        final num2 = (random.nextInt(maxSecondNum)) * 11; // another double digit
+        return {'num1': num1, 'num2': num2};
+        
+      default:
+        return {'num1': 5, 'num2': 3};
+    }
+  }
+
+  static Map<String, int> generateSubtractionNumbers(String difficulty) {
+    final random = Random();
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        // 1-digit numbers, result positive
+        final num1 = random.nextInt(9) + 1; // 1-9
+        final num2 = random.nextInt(num1) + 1; // ensures positive result
+        return {'num1': num1, 'num2': num2};
+        
+      case 'medium':
+        // 2-digit numbers without borrowing
+        final num1 = random.nextInt(90) + 10; // 10-99
+        final num2 = random.nextInt(num1 - 1) + 1; // ensures positive result
+        return {'num1': num1, 'num2': num2};
+        
+      case 'hard':
+        // 2-digit numbers with borrowing
+        final num1 = random.nextInt(40) + 50; // 50-90
+        final num2 = random.nextInt(40) + 10; // 10-50
+        return {'num1': num1, 'num2': num2};
+        
+      default:
+        return {'num1': 8, 'num2': 3};
+    }
+  }
+
+  static Map<String, int> generateMultiplicationNumbers(String difficulty) {
+    final random = Random();
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        // 1-digit numbers, product not exceeding 20
+        final num1 = random.nextInt(5) + 1; // 1-5
+        final num2 = random.nextInt(4) + 1; // 1-4
+        return {'num1': num1, 'num2': num2};
+        
+      case 'medium':
+        // 1-digit number times 1-digit number
+        final num1 = random.nextInt(9) + 1; // 1-9
+        final num2 = random.nextInt(9) + 1; // 1-9
+        return {'num1': num1, 'num2': num2};
+        
+      case 'hard':
+        // 2-digit number times 1-digit number
+        final num1 = random.nextInt(90) + 10; // 10-99
+        final num2 = random.nextInt(9) + 1; // 1-9
+        return {'num1': num1, 'num2': num2};
+        
+      default:
+        return {'num1': 4, 'num2': 3};
+    }
+  }
+
+  static Map<String, int> generateDivisionNumbers(String difficulty) {
+    final random = Random();
+    switch (difficulty.toLowerCase()) {
+      case 'easy':
+        // Simple divisions with no remainder
+        final num2 = random.nextInt(5) + 1; // 1-5 (divisor)
+        final product = num2 * (random.nextInt(5) + 1); // ensures clean division
+        return {'num1': product, 'num2': num2};
+        
+      case 'medium':
+        // Divisions with single-digit divisor
+        final num2 = random.nextInt(9) + 1; // 1-9 (divisor)
+        final product = num2 * (random.nextInt(10) + 1); // ensures clean division
+        return {'num1': product, 'num2': num2};
+        
+      case 'hard':
+        // Divisions with two-digit dividend and single-digit divisor
+        final num2 = random.nextInt(9) + 1; // 1-9 (divisor)
+        final product = num2 * (random.nextInt(9) + 2); // ensures clean division
+        return {'num1': product, 'num2': num2};
+        
+      default:
+        return {'num1': 12, 'num2': 3};
+    }
   }
 }

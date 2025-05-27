@@ -1,12 +1,8 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:giggle/core/constants/apitude_question_constants.dart';
 import 'package:giggle/core/data/question_request.dart';
 import 'package:giggle/core/models/question_model.dart';
-import 'package:http/http.dart' as http;
 
 /// Handles generation of options for different question types
 class OptionsGenerator {
@@ -15,62 +11,48 @@ class OptionsGenerator {
   // Helper method to ensure 2-digit numbers
   int _ensure2Digit(int number) {
     if (number < 10) {
-      // Convert single-digit to 2-digit
       return number + 10 + _random.nextInt(80);
     } else if (number >= 100) {
-      // Convert 3+ digit to 2-digit
       return 10 + _random.nextInt(89);
     }
     return number;
   }
 
   List<String> generateSequentialOptions(int correctNumber, int count) {
-    // Ensure correctNumber is 2-digit and < 100
     correctNumber = _ensure2Digit(correctNumber);
     final options = <String>{correctNumber.toString()};
 
     while (options.length < count) {
       final offset = _random.nextInt(5) + 1;
       int option = correctNumber + (_random.nextBool() ? offset : -offset);
-
-      // Ensure option is 2-digit and < 100
       option = _ensure2Digit(option);
-
       if (!options.contains(option.toString())) {
         options.add(option.toString());
       }
     }
-
     return options.toList()..shuffle();
   }
 
   List<String> generateOptions(String correctAnswer, int range) {
     final options = <String>{correctAnswer};
     int correctNum = int.parse(correctAnswer);
-
-    // Ensure correctNum is 2-digit and < 100
     correctNum = _ensure2Digit(correctNum);
 
     while (options.length < 4) {
       final offset = _random.nextInt(range) - (range ~/ 2);
       int option = correctNum + offset;
-
-      // Ensure option is 2-digit and < 100
       option = _ensure2Digit(option);
-
       if (!options.contains(option.toString()) && option != correctNum) {
         options.add(option.toString());
       }
     }
-
     return options.toList()..shuffle();
   }
 
   List<String> generateMonthOptions(String correctMonth) {
     final options = <String>{correctMonth};
     while (options.length < 4) {
-      final randomMonth = QuestionConstants
-          .months[_random.nextInt(QuestionConstants.months.length)];
+      final randomMonth = QuestionConstants.months[_random.nextInt(QuestionConstants.months.length)];
       if (!options.contains(randomMonth)) {
         options.add(randomMonth);
       }
@@ -81,8 +63,7 @@ class OptionsGenerator {
   List<String> generateDayOptions(String correctDay) {
     final options = <String>{correctDay};
     while (options.length < 4) {
-      final randomDay = QuestionConstants
-          .days[_random.nextInt(QuestionConstants.days.length)];
+      final randomDay = QuestionConstants.days[_random.nextInt(QuestionConstants.days.length)];
       if (!options.contains(randomDay)) {
         options.add(randomDay);
       }
@@ -100,27 +81,18 @@ class OptionsGenerator {
   }
 
   List<String> generateNumberOptions(int correctNumber, int min, int max) {
-    // Ensure correctNumber is 2-digit if it's for a numeric question
     if (min >= 10 && max <= 99) {
       correctNumber = _ensure2Digit(correctNumber);
     }
-
     final options = <String>{correctNumber.toString()};
-
     while (options.length < 4) {
-      int number;
-      if (min >= 10 && max <= 99) {
-        // For numeric ranges that should be 2-digit
-        number = 10 + _random.nextInt(89);
-      } else {
-        number = min + _random.nextInt(max - min + 1);
-      }
-
+      int number = min >= 10 && max <= 99
+          ? 10 + _random.nextInt(89)
+          : min + _random.nextInt(max - min + 1);
       if (!options.contains(number.toString())) {
         options.add(number.toString());
       }
     }
-
     return options.toList()..shuffle();
   }
 }
@@ -149,7 +121,6 @@ class VerbalQuestionGenerator {
 
   Question _generateVerbalNumberQuestion(String difficulty) {
     int baseNumber = _getBaseNumberForDifficulty(difficulty);
-
     if (_random.nextBool()) {
       final correctAnswer = (baseNumber + 1).toString();
       return Question(
@@ -161,18 +132,15 @@ class VerbalQuestionGenerator {
       final step = _random.nextInt(3) + 2;
       final sequence = List.generate(3, (i) => baseNumber + (i * step));
       final correctAnswer = (baseNumber + (3 * step)).toString();
-
       return Question(
         question: 'What comes next in the sequence: ${sequence.join(", ")}?',
-        options: _optionsGenerator.generateSequentialOptions(
-            int.parse(correctAnswer), 4),
+        options: _optionsGenerator.generateSequentialOptions(int.parse(correctAnswer), 4),
         correctAnswer: correctAnswer,
       );
     }
   }
 
   int _getBaseNumberForDifficulty(String difficulty) {
-    // Always return a 2-digit number < 100, regardless of difficulty
     return 10 + _random.nextInt(89);
   }
 
@@ -181,23 +149,18 @@ class VerbalQuestionGenerator {
     final correctAnswer = nums.$1 > nums.$2
         ? 'greater than'
         : (nums.$1 < nums.$2 ? 'less than' : 'equal to');
-
     return Question(
-      question:
-          'Is ${nums.$1} greater than, less than, or equal to ${nums.$2}?',
+      question: 'Is ${nums.$1} greater than, less than, or equal to ${nums.$2}?',
       options: ['greater than', 'less than', 'equal to', 'none'],
       correctAnswer: correctAnswer,
     );
   }
 
   (int, int) _generateNumberPairForDifficulty(String difficulty) {
-    // For "equal" cases, ensure both numbers are the same and < 100
     if (_random.nextInt(10) < 3) {
-      // 30% chance for equal numbers
-      final number = 10 + _random.nextInt(89); // 2-digit number < 100
+      final number = 10 + _random.nextInt(89);
       return (number, number);
     } else {
-      // For non-equal cases, generate two different 2-digit numbers < 100
       final num1 = 10 + _random.nextInt(89);
       int num2;
       do {
@@ -210,7 +173,6 @@ class VerbalQuestionGenerator {
   Question _generateVerbalOddEvenQuestion(String difficulty) {
     final number = _getBaseNumberForDifficulty(difficulty);
     final correctAnswer = number % 2 == 0 ? 'even' : 'odd';
-
     return Question(
       question: 'Is $number an odd number or an even number?',
       options: ['odd', 'even', 'neither', 'both'],
@@ -221,7 +183,6 @@ class VerbalQuestionGenerator {
   Question _generateVerbalTimeQuestion(String difficulty) {
     final hour = _random.nextInt(12) + 1;
     final previousHour = hour == 1 ? 12 : hour - 1;
-
     return Question(
       question: 'What time comes before $hour:00?',
       options: _optionsGenerator.generateTimeOptions(previousHour),
@@ -236,12 +197,9 @@ class VerbalQuestionGenerator {
       {'word': 'times', 'operation': 'multiplication'},
       {'word': 'divided by', 'operation': 'division'}
     ];
-
     final selectedOp = operations[_random.nextInt(operations.length)];
-
     return Question(
-      question:
-          'If someone says, "1 ${selectedOp['word']} 2", what operation is that?',
+      question: 'If someone says, "1 ${selectedOp['word']} 2", what operation is that?',
       options: ['addition', 'subtraction', 'multiplication', 'division'],
       correctAnswer: selectedOp['operation'] ?? '',
     );
@@ -256,9 +214,7 @@ class CalendarQuestionGenerator {
   Question generateMonthQuestion(String difficulty) {
     final questionTypes = ['after', 'before', 'between', 'days', 'position'];
     final questionType = questionTypes[_random.nextInt(questionTypes.length)];
-    final selectedMonth = QuestionConstants
-        .months[_random.nextInt(QuestionConstants.months.length)];
-
+    final selectedMonth = QuestionConstants.months[_random.nextInt(QuestionConstants.months.length)];
     switch (questionType) {
       case 'after':
         return _generateMonthAfterQuestion(selectedMonth);
@@ -327,9 +283,7 @@ class CalendarQuestionGenerator {
   Question generateDayQuestion(String difficulty) {
     final questionTypes = ['after', 'before', 'between', 'position'];
     final questionType = questionTypes[_random.nextInt(questionTypes.length)];
-    final selectedDay =
-        QuestionConstants.days[_random.nextInt(QuestionConstants.days.length)];
-
+    final selectedDay = QuestionConstants.days[_random.nextInt(QuestionConstants.days.length)];
     switch (questionType) {
       case 'after':
         return _generateDayAfterQuestion(selectedDay);
@@ -391,14 +345,8 @@ class TimeQuestionGenerator {
   final Random _random = Random();
 
   Question generateTimeQuestion(String difficulty) {
-    final questionTypes = [
-      'duration',
-      'next_hour',
-      'previous_hour',
-      'conversion'
-    ];
+    final questionTypes = ['duration', 'next_hour', 'previous_hour', 'conversion'];
     final questionType = questionTypes[_random.nextInt(questionTypes.length)];
-
     switch (questionType) {
       case 'duration':
         return _generateTimeDurationQuestion();
@@ -452,86 +400,61 @@ class TimeQuestionGenerator {
   }
 }
 
-/// Handles generation of procedural math questions
+/// Generates procedural math questions
 class ProceduralQuestionGenerator {
   final OptionsGenerator _optionsGenerator = OptionsGenerator();
   final Random _random = Random();
 
-  // Helper method to ensure 2-digit numbers
   int _ensure2Digit(int number) {
     if (number < 10) {
-      // Convert single-digit to 2-digit
       return number + 10 + _random.nextInt(80);
     } else if (number >= 100) {
-      // Convert 3+ digit to 2-digit
       return 10 + _random.nextInt(89);
     }
     return number;
   }
 
-  Question generateProceduralQuestion(
-      List<dynamic> questionData, String lesson, String difficulty) {
+  Question generateProceduralQuestion(String lesson, String difficulty) {
     String questionText;
     List<String> options;
-
-    // Process the data to ensure 2-digit numbers
-    List<int> processedData = [];
-    for (var i = 0; i < questionData.length; i++) {
-      try {
-        int val = int.parse(questionData[i].toString());
-        processedData.add(_ensure2Digit(val));
-      } catch (e) {
-        // If parsing fails, just keep the original data
-        processedData.add(10 + _random.nextInt(89));
-      }
-    }
-
-    // Recalculate the correct answer based on the processed numbers
-    int num1 = processedData[0];
-    int num2 = processedData[1];
+    int num1 = 10 + _random.nextInt(40); // 10-49
+    int num2 = 10 + _random.nextInt(40); // 10-49
     int correctNum;
 
     switch (lesson) {
       case 'ADDITION':
         correctNum = num1 + num2;
-        // Ensure the result is also 2-digit
         if (correctNum >= 100) {
-          // If sum exceeds 99, adjust one of the numbers
-          num1 = _random.nextInt(40) + 10; // 10-49
-          num2 = _random.nextInt(40) + 10; // 10-49
+          num1 = _random.nextInt(40) + 10;
+          num2 = _random.nextInt(40) + 10;
           correctNum = num1 + num2;
         }
         questionText = 'What is $num1 + $num2?';
         break;
       case 'SUBTRACTION':
-        // Ensure num1 > num2 for positive result
         if (num1 <= num2) {
           int temp = num1;
           num1 = num2;
           num2 = temp;
         }
         correctNum = num1 - num2;
-        // Ensure the result is 2-digit
         if (correctNum < 10) {
-          // Adjust to ensure 2-digit result
-          num1 = 50 + _random.nextInt(40); // 50-89
-          num2 = 10 + _random.nextInt(30); // 10-39
+          num1 = 50 + _random.nextInt(40);
+          num2 = 10 + _random.nextInt(30);
           correctNum = num1 - num2;
         }
         questionText = 'What is $num1 - $num2?';
         break;
       case 'MULTIPLICATION':
-        // For multiplication, use smaller numbers to keep product 2-digit
-        num1 = 2 + _random.nextInt(7); // 2-8
-        num2 = 5 + _random.nextInt(6); // 5-10
+        num1 = 2 + _random.nextInt(7);
+        num2 = 5 + _random.nextInt(6);
         correctNum = num1 * num2;
         questionText = 'What is $num1 × $num2?';
         break;
       case 'DIVISION':
-        // For division, ensure clean division with 2-digit result
-        num2 = 2 + _random.nextInt(5); // 2-6
-        correctNum = 10 + _random.nextInt(90 ~/ num2); // Ensure 2-digit result
-        num1 = correctNum * num2; // This may be 3-digit
+        num2 = 2 + _random.nextInt(5);
+        correctNum = 10 + _random.nextInt(90 ~/ num2);
+        num1 = correctNum * num2;
         questionText = 'What is $num1 ÷ $num2?';
         break;
       default:
@@ -539,8 +462,7 @@ class ProceduralQuestionGenerator {
     }
 
     String correctAnswer = correctNum.toString();
-    options = _optionsGenerator.generateOptions(
-        correctAnswer, _getDifficultyRange(difficulty));
+    options = _optionsGenerator.generateOptions(correctAnswer, _getDifficultyRange(difficulty));
 
     return Question(
       question: questionText,
@@ -563,14 +485,187 @@ class ProceduralQuestionGenerator {
   }
 }
 
+/// Generates semantic questions
+class SemanticQuestionGenerator {
+  final OptionsGenerator _optionsGenerator = OptionsGenerator();
+  final Random _random = Random();
+
+  Question generateSemanticQuestion(String lesson, String difficulty) {
+    switch (lesson) {
+      case 'ADDITION':
+      case 'SUBTRACTION':
+      case 'MULTIPLICATION':
+      case 'DIVISION':
+        return _generateSemanticMathQuestion(lesson, difficulty);
+      case 'NUMBERS':
+        return _generateSemanticNumberQuestion(difficulty);
+      case 'COMPARISON':
+        return _generateSemanticComparisonQuestion(difficulty);
+      case 'ODDEVEN':
+        return _generateSemanticOddEvenQuestion(difficulty);
+      case 'DAYS':
+        return _generateSemanticDayQuestion(difficulty);
+      case 'MONTHS':
+        return _generateSemanticMonthQuestion(difficulty);
+      case 'FRACTION':
+        return _generateSemanticFractionQuestion(difficulty);
+      default:
+        throw ArgumentError('Unsupported semantic lesson type: $lesson');
+    }
+  }
+
+  Question _generateSemanticMathQuestion(String lesson, String difficulty) {
+    int num1 = 10 + _random.nextInt(40);
+    int num2 = 10 + _random.nextInt(40);
+    int correctNum;
+    String operation;
+    switch (lesson) {
+      case 'ADDITION':
+        correctNum = num1 + num2;
+        operation = 'added to';
+        break;
+      case 'SUBTRACTION':
+        if (num1 < num2) {
+          int temp = num1;
+          num1 = num2;
+          num2 = temp;
+        }
+        correctNum = num1 - num2;
+        operation = 'taken from';
+        break;
+      case 'MULTIPLICATION':
+        num1 = 2 + _random.nextInt(7);
+        num2 = 5 + _random.nextInt(6);
+        correctNum = num1 * num2;
+        operation = 'multiplied by';
+        break;
+      case 'DIVISION':
+        num2 = 2 + _random.nextInt(5);
+        correctNum = 10 + _random.nextInt(90 ~/ num2);
+        num1 = correctNum * num2;
+        operation = 'divided by';
+        break;
+      default:
+        throw ArgumentError('Invalid lesson');
+    }
+    final questionText = 'If $num2 is $operation $num1, what is the result?';
+    return Question(
+      question: questionText,
+      options: _optionsGenerator.generateOptions(correctNum.toString(), _getDifficultyRange(difficulty)),
+      correctAnswer: correctNum.toString(),
+    );
+  }
+
+  Question _generateSemanticNumberQuestion(String difficulty) {
+    final baseNumber = 10 + _random.nextInt(89);
+    final correctAnswer = baseNumber.toString();
+    return Question(
+      question: 'Which number is represented by "$baseNumber"?',
+      options: _optionsGenerator.generateOptions(correctAnswer, _getDifficultyRange(difficulty)),
+      correctAnswer: correctAnswer,
+    );
+  }
+
+  Question _generateSemanticComparisonQuestion(String difficulty) {
+    final nums = _generateNumberPair();
+    final correctAnswer = nums.$1 > nums.$2 ? 'more' : (nums.$1 < nums.$2 ? 'less' : 'same');
+    return Question(
+      question: 'Does ${nums.$1} represent more, less, or the same as ${nums.$2}?',
+      options: ['more', 'less', 'same', 'none'],
+      correctAnswer: correctAnswer,
+    );
+  }
+
+  Question _generateSemanticOddEvenQuestion(String difficulty) {
+    final number = 10 + _random.nextInt(89);
+    final correctAnswer = number % 2 == 0 ? 'even' : 'odd';
+    return Question(
+      question: 'The number $number is:',
+      options: ['odd', 'even', 'prime', 'composite'],
+      correctAnswer: correctAnswer,
+    );
+  }
+
+  Question _generateSemanticDayQuestion(String difficulty) {
+    final selectedDay = QuestionConstants.days[_random.nextInt(QuestionConstants.days.length)];
+    final dayIndex = QuestionConstants.days.indexOf(selectedDay);
+    final nextDay = QuestionConstants.days[(dayIndex + 1) % 7];
+    return Question(
+      question: 'The day after $selectedDay is:',
+      options: _optionsGenerator.generateDayOptions(nextDay),
+      correctAnswer: nextDay,
+    );
+  }
+
+  Question _generateSemanticMonthQuestion(String difficulty) {
+    final selectedMonth = QuestionConstants.months[_random.nextInt(QuestionConstants.months.length)];
+    final days = QuestionConstants.daysInMonth[selectedMonth]!;
+    return Question(
+      question: 'How many days are in $selectedMonth?',
+      options: _optionsGenerator.generateNumberOptions(days, 28, 31),
+      correctAnswer: days.toString(),
+    );
+  }
+
+  Question _generateSemanticFractionQuestion(String difficulty) {
+    final denominator = 2 + _random.nextInt(5);
+    final numerator = 1 + _random.nextInt(denominator - 1);
+    final correctAnswer = '$numerator/$denominator';
+    return Question(
+      question: 'What fraction represents $numerator out of $denominator equal parts?',
+      options: _generateFractionOptions(correctAnswer),
+      correctAnswer: correctAnswer,
+    );
+  }
+
+  List<String> _generateFractionOptions(String correctAnswer) {
+    final options = <String>{correctAnswer};
+    while (options.length < 4) {
+      final denominator = 2 + _random.nextInt(5);
+      final numerator = 1 + _random.nextInt(denominator - 1);
+      final fraction = '$numerator/$denominator';
+      if (!options.contains(fraction)) {
+        options.add(fraction);
+      }
+    }
+    return options.toList()..shuffle();
+  }
+
+  (int, int) _generateNumberPair() {
+    if (_random.nextInt(10) < 3) {
+      final number = 10 + _random.nextInt(89);
+      return (number, number);
+    } else {
+      final num1 = 10 + _random.nextInt(89);
+      int num2;
+      do {
+        num2 = 10 + _random.nextInt(89);
+      } while (num1 == num2);
+      return (num1, num2);
+    }
+  }
+
+  int _getDifficultyRange(String difficulty) {
+    switch (difficulty) {
+      case 'EASY':
+        return 10;
+      case 'MEDIUM':
+        return 20;
+      case 'HARD':
+        return 30;
+      default:
+        return 20;
+    }
+  }
+}
+
 /// Main question generator class that coordinates all other generators
 class QuestionGenerator {
   final VerbalQuestionGenerator _verbalGenerator = VerbalQuestionGenerator();
-  final CalendarQuestionGenerator _calendarGenerator =
-      CalendarQuestionGenerator();
+  final CalendarQuestionGenerator _calendarGenerator = CalendarQuestionGenerator();
   final TimeQuestionGenerator _timeGenerator = TimeQuestionGenerator();
-  final ProceduralQuestionGenerator _proceduralGenerator =
-      ProceduralQuestionGenerator();
+  final ProceduralQuestionGenerator _proceduralGenerator = ProceduralQuestionGenerator();
+  final SemanticQuestionGenerator _semanticGenerator = SemanticQuestionGenerator();
 
   void _printQuestionDetails(Map<String, String> request, Question question) {
     print('Generated Question:');
@@ -583,79 +678,34 @@ class QuestionGenerator {
     print('-------------------');
   }
 
-  Future<Question?> _generateSingleQuestion(Map<String, String> request) async {
-    final mlIP = dotenv.env['MLIP']?.isEmpty ?? true
-        ? dotenv.env['DEFAULT_MLIP']
-        : dotenv.env['MLIP'];
-
-    if (mlIP == null) {
-      throw Exception('ML server IP not configured');
-    }
-
+  Question? _generateSingleQuestion(Map<String, String> request) {
     try {
-      // Handle special question types
-      if (request['lesson'] == 'MONTHS') {
-        final question = _calendarGenerator
-            .generateMonthQuestion(request['difficulty'] ?? 'EASY');
-        _printQuestionDetails(request, question);
-        return question;
-      }
-      if (request['lesson'] == 'DAYS') {
-        final question = _calendarGenerator
-            .generateDayQuestion(request['difficulty'] ?? 'EASY');
-        _printQuestionDetails(request, question);
-        return question;
-      }
-      if (request['lesson'] == 'TIME') {
-        final question = _timeGenerator
-            .generateTimeQuestion(request['difficulty'] ?? 'EASY');
-        _printQuestionDetails(request, question);
-        return question;
-      }
+      final dyscalculiaType = request['dyscalculia_type'];
+      final lesson = request['lesson'] ?? '';
+      final difficulty = request['difficulty'] ?? 'EASY';
 
-      // Check for verbal questions
-      if (request['dyscalculia_type'] == 'VERBAL') {
-        final question = _verbalGenerator.generateVerbalQuestion(
-          request['lesson'] ?? '',
-          request['difficulty'] ?? 'EASY',
-        );
-        _printQuestionDetails(request, question);
-        return question;
-      }
+      Question question;
 
-      // For other types, use ML server
-      final uri = Uri.parse(ApiEndpoints.questionGenerate);
-      print('Requesting question from: $uri');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(request),
-      );
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        Question question;
-
-        if (request['dyscalculia_type'] == 'PROCEDURAL') {
-          question = _proceduralGenerator.generateProceduralQuestion(
-            jsonResponse['question'],
-            request['lesson']!,
-            request['difficulty']!,
-          );
-        } else {
-          question = Question.fromJson(jsonResponse);
-        }
-
-        _printQuestionDetails(request, question);
-        return question;
+      if (lesson == 'MONTHS') {
+        question = _calendarGenerator.generateMonthQuestion(difficulty);
+      } else if (lesson == 'DAYS') {
+        question = _calendarGenerator.generateDayQuestion(difficulty);
+      } else if (lesson == 'TIME' && dyscalculiaType != 'VERBAL') {
+        question = _timeGenerator.generateTimeQuestion(difficulty);
+      } else if (dyscalculiaType == 'VERBAL') {
+        question = _verbalGenerator.generateVerbalQuestion(lesson, difficulty);
+      } else if (dyscalculiaType == 'PROCEDURAL') {
+        question = _proceduralGenerator.generateProceduralQuestion(lesson, difficulty);
+      } else if (dyscalculiaType == 'SEMANTIC') {
+        question = _semanticGenerator.generateSemanticQuestion(lesson, difficulty);
       } else {
-        print('Failed to generate question: ${response.statusCode}');
-        print('Response body: ${response.body}');
-        return null;
+        throw ArgumentError('Unsupported question type: $dyscalculiaType');
       }
-    } catch (e, stackTrace) {
+
+      _printQuestionDetails(request, question);
+      return question;
+    } catch (e) {
       print('Error generating question: $e');
-      print('Stack trace: $stackTrace');
       return null;
     }
   }
@@ -663,14 +713,14 @@ class QuestionGenerator {
   Future<List<Question>> generateQuestions(BuildContext context) async {
     List<Question> questions = [];
 
-    for (var i = 0; i < questionRequests.length; i++) {
+    for (var request in questionRequests) {
       if (!context.mounted) return questions;
 
-      final question = await _generateSingleQuestion(questionRequests[i]);
+      final question = _generateSingleQuestion(request);
       if (question != null) {
         questions.add(question);
       } else {
-        throw Exception('Failed to generate question ${i + 1}');
+        throw Exception('Failed to generate question for request: $request');
       }
     }
 

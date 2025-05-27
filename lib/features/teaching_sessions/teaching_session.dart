@@ -15,6 +15,7 @@ import 'package:video_player/video_player.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:giggle/core/widgets/bg_pattern.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 
 class TeachingSessionScreen extends StatefulWidget {
   final Map<String, String>? difficultyLevels;
@@ -49,10 +50,12 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
   late Animation<double> _fadeAnimation;
 
   // State flags
-  bool _isPlaying = false;
+  bool _isPlaying = true;
   bool _isCameraInitialized = false;
   bool _isNavigating = false;
   bool _isCleaningUp = false;
+  bool _isVideoCompleted = false;
+  bool _hasUserConfirmedUnderstanding = false; // New state variable
 
   // Camera and analysis
   CameraController? _cameraController;
@@ -125,6 +128,40 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
     try {
       await _videoController!.initialize();
       _logInfo('Video initialized successfully');
+
+      // Listen for video completion and progress
+      _videoController!.addListener(() {
+        if (_videoController!.value.isInitialized) {
+          if (!_videoController!.value.isPlaying &&
+              _videoController!.value.position >= _videoController!.value.duration) {
+            if (!_isVideoCompleted) {
+              setState(() {
+                _isVideoCompleted = true;
+                _isPlaying = false;
+              });
+              _logInfo('Video completed');
+              // Auto show confirmation dialog when video ends
+              _showVoiceConfirmationDialog().then((understood) {
+                setState(() {
+                  _hasUserConfirmedUnderstanding = understood;
+                  if (!understood) {
+                    // If not understood, reset video to beginning
+                    _videoController!.seekTo(Duration.zero);
+                    _isVideoCompleted = false;
+                  }
+                });
+              });
+            }
+          }
+
+          // Update video progress
+          setState(() {
+            _videoProgress = _videoController!.value.position.inMilliseconds /
+                _videoController!.value.duration.inMilliseconds;
+          });
+        }
+      });
+
       if (mounted) setState(() {});
     } catch (e) {
       _logError('Error initializing video: $e');
@@ -493,6 +530,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
     try {
       if (_videoController != null) {
         await _videoController!.pause();
+        _videoController!.removeListener(() {}); // Remove listener
         await _videoController!.dispose();
         _videoController = null;
       }
@@ -578,8 +616,99 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
     return false;
   }
 
+  Future<bool> _showVoiceConfirmationDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Confirm Understanding',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1D1D1F),
+            ),
+          ),
+          content: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'Did you understand the concepts taught in this lesson?',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF1D1D1F),
+              ),
+            ),
+          ),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      ),
+                    ),
+                    child: const Text(
+                      'No',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFFFF3B30),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onPressed: () {
+                      // Play error sound
+                      SystemSound.play(SystemSoundType.alert);
+                      Navigator.of(context).pop(false);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: const Color(0xFF30D158).withOpacity(0.1),
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Yes',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF30D158),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    onPressed: () {
+                      // Play success sound
+                      HapticFeedback.mediumImpact();
+                      Navigator.of(context).pop(true);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        );
+      },
+    ) ?? false; // Default to false if dialog is dismissed somehow
+  }
+
   void _navigateToInteractiveSession() async {
-    if (_isNavigating) return;
+    if (_isNavigating || !_hasUserConfirmedUnderstanding) return;
+
     setState(() {
       _isNavigating = true;
     });
@@ -650,6 +779,7 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
 
   @override
   Widget build(BuildContext context) {
+    print(widget.dyscalculiaType);
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
@@ -678,29 +808,32 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
                             toggleVideo: _toggleVideo,
                           ),
                           const SizedBox(height: 20),
-                          ConcentrationMonitor(
-                            concentrationStatus: _concentrationStatus,
-                            concentrationScore: _concentrationScore,
-                            statusColor: _statusColor,
-                            isCameraInitialized: _isCameraInitialized,
-                            cameraController: _cameraController,
-                            emotionStatus: _emotionStatus,
-                            onEmotionDetected: (emotion) {
-                              setState(() {
-                                _emotionStatus = emotion;
-                              });
-                            },
-                          ),
+                          if (widget.dyscalculiaType == "Semantic Dyscalculia")
+                            ConcentrationMonitor(
+                              concentrationStatus: _concentrationStatus,
+                              concentrationScore: _concentrationScore,
+                              statusColor: _statusColor,
+                              isCameraInitialized: _isCameraInitialized,
+                              cameraController: _cameraController,
+                              emotionStatus: _emotionStatus,
+                              onEmotionDetected: (emotion) {
+                                setState(() {
+                                  _emotionStatus = emotion;
+                                });
+                              },
+                            ),
                           const SizedBox(height: 20),
                           LessonInfo(
                             dyscalculiaType: widget.dyscalculiaType,
                             courseName: widget.courseName,
                             concentrationScore: _concentrationScore,
+                            videoController: _videoController,
                           ),
                           const SizedBox(height: 20),
                           NextButton(
                             onTap: _navigateToInteractiveSession,
                             text: 'Complete Session',
+                            disabled: !_isVideoCompleted || !_hasUserConfirmedUnderstanding,
                           ),
                           const SizedBox(height: 40),
                         ],
@@ -792,10 +925,11 @@ class _TeachingSessionScreenState extends State<TeachingSessionScreen>
                           ),
                         ],
                       ),
-                      FocusIndicator(
-                        statusColor: _statusColor,
-                        concentrationScore: _concentrationScore,
-                      ),
+                      if (widget.dyscalculiaType == "Semantic Dyscalculia")
+                        FocusIndicator(
+                          statusColor: _statusColor,
+                          concentrationScore: _concentrationScore,
+                        ),
                     ],
                   ),
                 ],

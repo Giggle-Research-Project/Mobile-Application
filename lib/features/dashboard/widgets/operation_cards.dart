@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:giggle/features/dashboard/widgets/common_card.dart';
 import 'package:giggle/features/dashboard/widgets/progress_bar_custom.dart';
+import 'package:giggle/features/dashboard/operation_detail_screen.dart';
 
 class OperationCards extends StatelessWidget {
   final Map<String, dynamic> operation;
@@ -10,7 +11,8 @@ class OperationCards extends StatelessWidget {
       _navigateToOperationDetail;
   final String Function(DateTime) _formatLastActivity;
 
-  OperationCards({
+  const OperationCards({
+    Key? key,
     required this.operation,
     required Map<String, Map<String, dynamic>> operationData,
     required Function(String, Map<String, dynamic>, Color)
@@ -18,9 +20,10 @@ class OperationCards extends StatelessWidget {
     required String Function(DateTime) formatLastActivity,
   })  : _operationData = operationData,
         _navigateToOperationDetail = navigateToOperationDetail,
-        _formatLastActivity = formatLastActivity;
+        _formatLastActivity = formatLastActivity,
+        super(key: key);
 
-  Widget _buildOperationCard(Map<String, dynamic> operation) {
+  Widget _buildOperationCard(BuildContext context, Map<String, dynamic> operation) {
     final title = operation['title'] as String;
     final icon = operation['icon'] as IconData;
     final color = operation['color'] as Color;
@@ -48,7 +51,18 @@ class OperationCards extends StatelessWidget {
         title == 'Subtraction' && data.containsKey('proceduralPrediction');
 
     return GestureDetector(
-      onTap: () => _navigateToOperationDetail(title, data, color),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => OperationDetailScreen(
+              operationName: title,
+              operationData: data,
+              color: color,
+            ),
+          ),
+        );
+      },
       child: CommonCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,6 +140,6 @@ class OperationCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _buildOperationCard(operation);
+    return _buildOperationCard(context, operation);
   }
 }

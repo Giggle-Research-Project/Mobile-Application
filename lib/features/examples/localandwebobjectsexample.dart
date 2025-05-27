@@ -212,7 +212,7 @@ class _ARMathGameState extends State<ARMathGame> {
                     ElevatedButton(
                       onPressed: _checkAnswer,
                       style: ElevatedButton.styleFrom(
-                        primary: Colors.green,
+                        backgroundColor: Colors.green,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
                           vertical: 16,
@@ -231,7 +231,7 @@ class _ARMathGameState extends State<ARMathGame> {
               ElevatedButton(
                 onPressed: _startPlacingStones,
                 style: ElevatedButton.styleFrom(
-                  primary: Colors.blue,
+                  backgroundColor: Colors.blue,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
                     vertical: 16,

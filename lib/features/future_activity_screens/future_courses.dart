@@ -236,7 +236,7 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
       // Second path (functionActivities)
       try {
         final verbalDocFuture = await FirebaseFirestore.instance
-            .collection('functionActivities')
+            .collection('futureActivities')
             .doc(widget.userId)
             .collection(operation)
             .doc('Verbal Dyscalculia')
@@ -249,7 +249,7 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
         }
 
         final semanticDocFuture = await FirebaseFirestore.instance
-            .collection('functionActivities')
+            .collection('futureActivities')
             .doc(widget.userId)
             .collection(operation)
             .doc('Semantic Dyscalculia')
@@ -263,7 +263,7 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
         }
 
         final proceduralDocFuture = await FirebaseFirestore.instance
-            .collection('functionActivities')
+            .collection('futureActivities')
             .doc(widget.userId)
             .collection(operation)
             .doc('Procedural Dyscalculia')
@@ -465,12 +465,13 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
           child: Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(15), // Reduced padding
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min, // Added this
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10), // Reduced padding
                       decoration: BoxDecoration(
                         color: isUnlocked
                             ? baseColor.withOpacity(0.1)
@@ -480,26 +481,26 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
                       child: Icon(
                         course['icon'],
                         color: isUnlocked ? baseColor : Colors.grey.shade400,
-                        size: 32,
+                        size: 28, // Reduced size
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 8),
                     Text(
                       title,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18, // Reduced font size
                         fontWeight: FontWeight.bold,
                         color: isUnlocked
                             ? const Color(0xFF1D1D1F)
                             : Colors.grey.shade400,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4), // Reduced spacing
                     Text(
                       course['subtitle'],
                       style: TextStyle(
-                        fontSize: 14,
-                        height: 1.3,
+                        fontSize: 12, // Reduced font size
+                        height: 1.2,
                         color: isUnlocked
                             ? const Color(0xFF1D1D1F).withOpacity(0.6)
                             : Colors.grey.shade400,
@@ -507,36 +508,37 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4), // Reduced spacing
                     Text(
                       "${questionsByOperation[title]?.length ?? 0} questions",
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11, // Reduced font size
                         color: isUnlocked
                             ? Colors.grey.shade600
                             : Colors.grey.shade400,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4), // Reduced spacing
                     Row(
                       children: [
-                        Text(
-                          isCompleted
-                              ? 'Completed'
-                              : isUnlocked
-                                  ? 'Start Learning'
-                                  : 'Locked',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isCompleted
-                                ? Colors.green
+                        Expanded(
+                          child: Text(
+                            isCompleted
+                                ? 'Completed'
                                 : isUnlocked
-                                    ? baseColor
-                                    : Colors.grey.shade400,
+                                    ? 'Start Learning'
+                                    : 'Locked',
+                            style: TextStyle(
+                              fontSize: 13, // Reduced font size
+                              fontWeight: FontWeight.w600,
+                              color: isCompleted
+                                  ? Colors.green
+                                  : isUnlocked
+                                      ? baseColor
+                                      : Colors.grey.shade400,
+                            ),
                           ),
                         ),
-                        const Spacer(),
                         Icon(
                           isCompleted
                               ? Icons.check_circle
@@ -548,7 +550,7 @@ class _FutureCoursesState extends ConsumerState<FutureCourses>
                               : isUnlocked
                                   ? baseColor
                                   : Colors.grey.shade400,
-                          size: 20,
+                          size: 18, // Reduced size
                         ),
                       ],
                     ),

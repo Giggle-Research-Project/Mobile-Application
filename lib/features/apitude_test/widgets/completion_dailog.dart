@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:giggle/core/enums/enums.dart';
 import 'package:giggle/core/widgets/bottom_navbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -158,6 +159,11 @@ class CompletionDialog extends StatelessWidget {
   Widget _buildCompletionStats(String timeDisplay) {
     final answeredQuestions = answers.where((answer) => answer != null).length;
     final completionRate = (answeredQuestions / questions.length * 100).round();
+    
+    // Calculate percentages
+    final correctPercentage = (correctAnswers / questions.length * 100).round();
+    final incorrectAnswers = answeredQuestions - correctAnswers;
+    final incorrectPercentage = (incorrectAnswers / questions.length * 100).round();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -167,14 +173,120 @@ class CompletionDialog extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _buildStatRow(
-              'Questions Answered', '$answeredQuestions/${questions.length}'),
-          const SizedBox(height: 8),
-          _buildStatRow('Completion Rate', '$completionRate%'),
-          const SizedBox(height: 8),
-          _buildStatRow('Time Taken', timeDisplay),
+          if (testType == TestScreenType.skillAssessment.toString()) ...[
+            _buildStatRow('Questions Answered', '$answeredQuestions/${questions.length}'),
+            const SizedBox(height: 8),
+            _buildStatRow('Completion Rate', '$completionRate%'),
+            const SizedBox(height: 8),
+            _buildStatRow('Time Taken', timeDisplay),
+            const SizedBox(height: 16),
+            _buildAnswerStats(
+              correct: correctAnswers,
+              incorrect: incorrectAnswers,
+              total: questions.length,
+              correctPercentage: correctPercentage,
+              incorrectPercentage: incorrectPercentage,
+            ),
+          ] else ...[
+            _buildStatRow('Questions Answered', '$answeredQuestions/${questions.length}'),
+            const SizedBox(height: 8),
+            _buildStatRow('Completion Rate', '$completionRate%'),
+            const SizedBox(height: 8),
+            _buildStatRow('Time Taken', timeDisplay),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAnswerStats({
+    required int correct,
+    required int incorrect,
+    required int total,
+    required int correctPercentage,
+    required int incorrectPercentage,
+  }) {
+    return Column(
+      children: [
+        const Divider(),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _buildAnswerIndicator(
+                label: 'Correct',
+                count: correct,
+                total: total,
+                percentage: correctPercentage,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildAnswerIndicator(
+                label: 'Incorrect',
+                count: incorrect,
+                total: total,
+                percentage: incorrectPercentage,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnswerIndicator({
+    required String label,
+    required int count,
+    required int total,
+    required int percentage,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF6E6E73),
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Stack(
+          children: [
+            Container(
+              height: 4,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            FractionallySizedBox(
+              widthFactor: percentage / 100,
+              child: Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$count/$total ($percentage%)',
+          style: TextStyle(
+            color: color,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 

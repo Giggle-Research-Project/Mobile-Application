@@ -5,54 +5,45 @@ import 'package:giggle/core/providers/theme_provider.dart';
 class NextButton extends ConsumerWidget {
   final VoidCallback onTap;
   final String text;
+  final bool disabled;
 
-  const NextButton({Key? key, required this.onTap, required this.text})
-      : super(key: key);
+  const NextButton({
+    super.key,
+    required this.onTap,
+    required this.text,
+    this.disabled = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeData = ref.watch(themeProvider).valueOrNull ??
-        const AppTheme(primaryColor: Color(0xFF4F46E5));
-    final themeColor = themeData.primaryColor;
+    final themeAsync = ref.watch(themeProvider);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        width: double.infinity,
-        height: 60,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [themeColor, Color(0xFF30D158)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+    return themeAsync.when(
+      data: (theme) => GestureDetector(
+        onTap: disabled ? null : onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: disabled
+                ? Colors.grey.withOpacity(0.3)
+                : theme.primaryColor,
+            borderRadius: BorderRadius.circular(15),
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF5E5CE6).withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
-            child: Center(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+          child: Center(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: disabled ? Colors.grey : Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
         ),
       ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => const SizedBox(),
     );
   }
 }
