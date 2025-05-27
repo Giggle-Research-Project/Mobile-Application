@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:giggle/core/data/question_request.dart';
-import 'package:giggle/core/data/questions.dart';
+import 'package:giggle/core/data/questions_english.dart';
 import 'package:giggle/core/enums/enums.dart';
 import 'package:giggle/core/models/question_model.dart';
 import 'package:giggle/core/providers/theme_provider.dart';
@@ -107,7 +107,7 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
   }
 
   Future<void> _navigateToTest(BuildContext context, TestScreenType testType,
-      String questionCount) async {
+      String questionCount, [List<Map<String, dynamic>>? questions]) async {
     if (_isCheckingStatus) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -133,8 +133,8 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
 
     if (testType == TestScreenType.skillAssessment) {
       await _handleSkillAssessment(context, questionCount);
-    } else if (testType == TestScreenType.parentQuestionnaire) {
-      _handleParentQuestionnaire(context, questionCount);
+    } else if (testType == TestScreenType.parentQuestionnaire && questions != null) {
+      _handleParentQuestionnaire(context, questionCount, questions);
     }
   }
 
@@ -175,9 +175,10 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
     }
   }
 
-  void _handleParentQuestionnaire(BuildContext context, String questionCount) {
+  void _handleParentQuestionnaire(BuildContext context, String questionCount,
+      List<Map<String, dynamic>> questions) {
     _launchTestScreen(context, TestScreenType.parentQuestionnaire,
-        _parentQuestions, 1200, questionCount);
+        questions.map((q) => Question.fromJson(q)).toList(), 1200, questionCount);
   }
 
   void _launchTestScreen(BuildContext context, TestScreenType testType,
@@ -253,8 +254,14 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
       final parentTimeMatch = timePattern.firstMatch(parentTimeSpent);
 
       // Calculate combined score
-      final double skillScore = skillData['overallScore'] ?? 0.0;
-      final double parentScore = parentData['overallScore'] ?? 0.0;
+      final double skillScore = (skillData['overallScore'] is int) 
+          ? (skillData['overallScore'] as int).toDouble() 
+          : (skillData['overallScore'] as double? ?? 0.0);
+
+      final double parentScore = (parentData['overallScore'] is int) 
+          ? (parentData['overallScore'] as int).toDouble() 
+          : (parentData['overallScore'] as double? ?? 0.0);
+
       final double combinedScore = (skillScore + parentScore) / 2;
 
       // Call the predict function with the variables now defined
@@ -343,8 +350,10 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
           context,
           MaterialPageRoute(
             builder: (context) => PerformanceResultScreen(
-              score: double.parse(overallScore),
-              timeSpent: combinedTimeSpent,
+              score: double.tryParse(overallScore) ?? combinedScore,
+              timeSpent: skillTimeSpent,
+              skillCorrectAnswers: skillCorrect,
+              skillTotalQuestions: skillTotal,
               correctAnswers: combinedCorrectAnswers,
               totalQuestions: combinedTotalQuestions,
               categoryLevels: categoryLevels,
@@ -704,10 +713,11 @@ class _TestSelectionScreenState extends ConsumerState<TestSelectionScreen>
                           themeColor: themeColor,
                           isParentQuestionnaireCompleted:
                               _parentQuestionnaireCompleted,
-                          onTap: (testType) => _navigateToTest(
+                          onTap: (testType, questions) => _navigateToTest(
                             context,
                             testType,
                             parentQuestions.length.toString(),
+                            questions,
                           ),
                         ),
                         const SizedBox(height: 20),

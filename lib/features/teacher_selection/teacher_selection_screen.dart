@@ -89,74 +89,79 @@ class _TeacherSelectionScreenState extends ConsumerState<TeacherSelectionScreen>
         children: [
           BackgroundPattern(),
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SubPageHeader(
-                  title: 'Choose Your Teacher',
-                  desc: '${widget.courseName} - ${widget.dyscalculiaType}',
-                ),
-                const SizedBox(height: 20),
-                _buildTitle(),
-                const SizedBox(height: 40),
-                _buildCharacterCarousel(themeColor),
-                const SizedBox(height: 30),
-                _buildCharacterInfo(),
-                const SizedBox(height: 20),
-                _buildNavigationButtons(themeColor: themeColor),
-                const Spacer(),
-                NextButton(
-                  text: 'Start Learning with ${_selectedTeacher.name}',
-                  onTap: () {
-                    if (widget.dyscalculiaType == 'Semantic Dyscalculia') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              SemanticInteractiveSessionScreen(
-                            difficultyLevels: widget.difficultyLevels,
-                            dyscalculiaType: widget.dyscalculiaType,
-                            questions: widget.questions,
-                            courseName: widget.courseName,
-                            selectedTeacher: _selectedTeacher.name,
-                            userId: widget.userId,
-                          ),
-                        ),
-                      );
-                    } else if (widget.dyscalculiaType ==
-                        'Procedural Dyscalculia') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProceduralInteractiveSession(
-                            difficultyLevels: widget.difficultyLevels,
-                            dyscalculiaType: widget.dyscalculiaType,
-                            questions: widget.questions,
-                            courseName: widget.courseName,
-                            selectedTeacher: _selectedTeacher.name,
-                            userId: widget.userId,
-                          ),
-                        ),
-                      );
-                    } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => VerbalInteractiveSessionScreen(
-                            difficultyLevels: widget.difficultyLevels,
-                            dyscalculiaType: widget.dyscalculiaType,
-                            questions: widget.questions,
-                            courseName: widget.courseName,
-                            selectedTeacher: _selectedTeacher.name,
-                            userId: widget.userId,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 30),
-              ],
+            child: SingleChildScrollView( // Wrap with SingleChildScrollView
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SubPageHeader(
+                    title: 'Choose Your Teacher',
+                    desc: '${widget.courseName} - ${widget.dyscalculiaType}',
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTitle(),
+                  const SizedBox(height: 40),
+                  _buildCharacterCarousel(themeColor),
+                  const SizedBox(height: 30),
+                  _buildCharacterInfo(),
+                  const SizedBox(height: 20),
+                  _buildNavigationButtons(themeColor: themeColor),
+                  const SizedBox(height: 30),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: NextButton(
+                      text: 'Start Learning with ${_selectedTeacher.name}',
+                      onTap: () {
+                        if (widget.dyscalculiaType == 'Semantic Dyscalculia') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  SemanticInteractiveSessionScreen(
+                                difficultyLevels: widget.difficultyLevels,
+                                dyscalculiaType: widget.dyscalculiaType,
+                                questions: widget.questions,
+                                courseName: widget.courseName,
+                                selectedTeacher: _selectedTeacher.name,
+                                userId: widget.userId,
+                              ),
+                            ),
+                          );
+                        } else if (widget.dyscalculiaType ==
+                            'Procedural Dyscalculia') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProceduralInteractiveSession(
+                                difficultyLevels: widget.difficultyLevels,
+                                dyscalculiaType: widget.dyscalculiaType,
+                                questions: widget.questions,
+                                courseName: widget.courseName,
+                                // selectedTeacher: _selectedTeacher.name,
+                                userId: widget.userId,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => VerbalInteractiveSessionScreen(
+                                difficultyLevels: widget.difficultyLevels,
+                                dyscalculiaType: widget.dyscalculiaType,
+                                questions: widget.questions,
+                                courseName: widget.courseName,
+                                userId: widget.userId,
+                                
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
             ),
           ),
         ],

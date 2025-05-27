@@ -200,7 +200,8 @@ class _LessonsScreenState extends ConsumerState<LessonsScreen>
         'icon': Icons.account_tree,
         'color': const Color(0xFF5E5CE6),
         'type': 'Procedural Dyscalculia',
-        'isLocked': semanticCompleted ? false : true,
+        // 'isLocked': semanticCompleted ? false : true,
+        'isLocked': false,
         'isCompleted': proceduralCompleted,
       },
       {
@@ -210,7 +211,8 @@ class _LessonsScreenState extends ConsumerState<LessonsScreen>
         'icon': Icons.record_voice_over,
         'color': const Color(0xFFFF9F0A),
         'type': 'Verbal Dyscalculia',
-        'isLocked': proceduralCompleted ? false : true,
+        // 'isLocked': proceduralCompleted ? false : true,
+        'isLocked': false,
         'isCompleted': verbalCompleted,
       },
     ];

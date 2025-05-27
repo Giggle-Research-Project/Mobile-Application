@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:giggle/core/constants/api_endpoints.dart';
 import 'package:giggle/core/models/user_model.dart';
 import 'package:giggle/core/providers/auth_provider.dart';
 import 'package:http/http.dart' as http;
@@ -22,13 +23,15 @@ class SoloVerbalSessionScreen extends ConsumerStatefulWidget {
   final String courseName;
   final List<Map<String, dynamic>> questions;
   final String index;
+  final String userId;
 
   const SoloVerbalSessionScreen({
     required this.dyscalculiaType,
     required this.courseName,
     required this.questions,
     required this.index,
-    Key? key,
+    required this.userId,
+    Key? key, required Null Function(bool isCorrect, double timeElapsed) onQuestionCompleted,
   }) : super(key: key);
 
   @override
@@ -97,8 +100,7 @@ class _SoloVerbalSessionScreenState
 
   Future<String> sendAudioToML(File audioFile,
       Function(String message, bool isError) showSnackBar) async {
-    final String mlIP = dotenv.env['MLIP'] ?? '127.0.0.1';
-    final url = Uri.parse('http://$mlIP:8000/transcribe');
+    final url = Uri.parse(ApiEndpoints.transcribe);
 
     if (!audioFile.existsSync()) {
       return 'Error: Audio file does not exist';
@@ -174,14 +176,14 @@ class _SoloVerbalSessionScreenState
     }
   }
 
-  Future<void> _stopRecording(String userId) async {
+  Future<void> _stopRecording() async {
     if (!_isRecording || _isStoppingRecording) return;
 
     try {
       setState(() => _isStoppingRecording = true);
       await _recorder.stop();
       setState(() => _isRecording = false);
-      await _processRecording(userId);
+      await _processRecording();
     } catch (e) {
       _showSnackBar('Failed to stop recording: $e', true);
     } finally {
@@ -189,13 +191,22 @@ class _SoloVerbalSessionScreenState
     }
   }
 
-  Future<void> _processRecording(String userId) async {
+// In SoloVerbalSessionScreen.dart
+  Future<void> _processRecording() async {
     setState(() => _isProcessing = true);
     try {
       final audioFile = File(_recordedFilePath);
       final transcription = await sendAudioToML(audioFile, _showSnackBar);
+      print('Transcription: $transcription');
+
       setState(() => _transcribedText = transcription.toLowerCase());
-      _checkAnswer(userId);
+      
+      // Add delay before showing the result dialog
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (mounted) {
+        _checkAnswer();
+      }
     } catch (e) {
       _showSnackBar('Error processing recording: $e', true);
     } finally {
@@ -214,29 +225,87 @@ class _SoloVerbalSessionScreenState
     }
   }
 
-  void _checkAnswer(String userId) {
+  void _checkAnswer() {
     final currentQuestion = widget.questions[_currentQuestionIndex];
-    String correctAnswer =
-        currentQuestion['correctAnswer'].toString().toLowerCase();
+    String correctAnswer = currentQuestion['correctAnswer'].toString().toLowerCase();
+    String userAnswer = _transcribedText.toLowerCase();
 
-    if (_transcribedText.toLowerCase().contains(correctAnswer)) {
-      _showResultDialog(true, userId);
-    } else {
-      _showResultDialog(false, userId);
+    // Handle different operation types
+    switch (widget.courseName.toUpperCase()) {
+      case 'ADDITION':
+        // Check for variations of addition answers
+        if (userAnswer.contains(correctAnswer) ||
+            userAnswer.replaceAll(RegExp(r'[^0-9]'), '') == correctAnswer) {
+          _showResultDialog(true);
+        } else {
+          _showResultDialog(false);
+        }
+        break;
+      case 'SUBTRACTION':
+        // Check for variations of subtraction answers
+        if (userAnswer.contains(correctAnswer) ||
+            userAnswer.replaceAll(RegExp(r'[^0-9-]'), '') == correctAnswer) {
+          _showResultDialog(true);
+        } else {
+          _showResultDialog(false);
+        }
+        break;
+      case 'MULTIPLICATION':
+        // Check for variations of multiplication answers
+        if (userAnswer.contains(correctAnswer) ||
+            userAnswer.replaceAll(RegExp(r'[^0-9]'), '') == correctAnswer) {
+          _showResultDialog(true);
+        } else {
+          _showResultDialog(false);
+        }
+        break;
+      case 'DIVISION':
+        // Check for variations of division answers
+        if (userAnswer.contains(correctAnswer) ||
+            userAnswer.replaceAll(RegExp(r'[^0-9.]'), '') == correctAnswer) {
+          _showResultDialog(true);
+        } else {
+          _showResultDialog(false);
+        }
+        break;
+      default:
+        // Default case - strict equality check
+        if (userAnswer.contains(correctAnswer)) {
+          _showResultDialog(true);
+        } else {
+          _showResultDialog(false);
+        }
     }
   }
 
-  void _showResultDialog(bool isCorrect, String userId) {
+  void _showResultDialog(bool isCorrect) {
     String getQuestionKey(String index) {
-      switch (index) {
-        case '0':
-          return 'questionOne';
-        case '1':
-          return 'questionTwo';
-        case '2':
-          return 'questionThree';
-        default:
-          return index;
+      // Parse out the challenge number and question number
+      final parts = index.split('-');
+      if (parts.length == 2) {
+        // For challenge-specific questions (e.g., "1-0")
+        switch (parts[0]) {
+          case '1':
+            return 'questionOne';
+          case '2':
+            return 'questionTwo';
+          case '3':
+            return 'questionThree';
+          default:
+            return 'questionOne';
+        }
+      } else {
+        // For legacy format
+        switch (index) {
+          case '0':
+            return 'questionOne';
+          case '1':
+            return 'questionTwo';
+          case '2':
+            return 'questionThree';
+          default:
+            return index;
+        }
       }
     }
 
@@ -245,100 +314,219 @@ class _SoloVerbalSessionScreenState
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(
-            'Time Elapsed: $_timeElapsed seconds',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isCorrect ? Colors.green : Colors.red,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Colors.white,
+          content: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Result Icon with Animation
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 500),
+                  scale: 1.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isCorrect ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                    ),
+                    child: Icon(
+                      isCorrect ? Icons.check_circle : Icons.cancel,
+                      size: 64,
+                      color: isCorrect ? Colors.green : Colors.red,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Result Text
+                Text(
+                  isCorrect ? 'Excellent!' : 'Keep Trying!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isCorrect ? Colors.green : Colors.red,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Time Info
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Time: $_timeElapsed seconds',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Answer Details
+                if (!isCorrect) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Your Answer:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _transcribedText,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.red,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Correct Answer:',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.questions[_currentQuestionIndex]['correctAnswer'],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 24),
+                
+                // Complete Button
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isCorrect ? Colors.green : Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final parts = widget.index.split('-');
+                    final challengeNumber = parts[0];
+                    final questionNumber = parts[1];
+                    final questionKey = getQuestionKey(widget.index);
+                    
+                    // Get reference to the base path
+                    final baseRef = FirebaseFirestore.instance
+                        .collection('functionActivities')
+                        .doc(widget.userId)
+                        .collection(widget.courseName)
+                        .doc('Verbal Dyscalculia')
+                        .collection('solo_sessions')
+                        .doc('progress');
+
+                    try {
+                      // Save individual question progress
+                      await baseRef
+                          .collection(questionKey)
+                          .doc('status')
+                          .collection('questionDetails')
+                          .doc('question-$questionNumber')
+                          .set({
+                            'completed': true,
+                            'isCorrect': isCorrect,
+                            'timestamp': FieldValue.serverTimestamp(),
+                            'timeElapsed': _timeElapsed,
+                            'transcribedAnswer': _transcribedText,
+                          }, SetOptions(merge: true));
+
+                      // If this is question 9 (the last question), mark the challenge as completed
+                      if (int.parse(questionNumber) == 9) {
+                        await baseRef
+                            .collection(questionKey)
+                            .doc('status')
+                            .set({
+                              'completed': true,
+                              'completedAt': FieldValue.serverTimestamp(),
+                              'challengeNumber': challengeNumber,
+                            }, SetOptions(merge: true));
+            
+                        // Check if all challenges are completed
+                        final challengeOneStatus = await baseRef.collection('questionOne').doc('status').get();
+                        final challengeTwoStatus = await baseRef.collection('questionTwo').doc('status').get();
+                        final challengeThreeStatus = await baseRef.collection('questionThree').doc('status').get();
+                        
+                        if (challengeOneStatus.data()?['completed'] == true &&
+                            challengeTwoStatus.data()?['completed'] == true &&
+                            challengeThreeStatus.data()?['completed'] == true) {
+                          // All challenges are completed, update the progress document
+                          await baseRef.set({
+                            'completed': true,
+                            'timeElapsed': _timeElapsed,
+                          }, SetOptions(merge: true));
+                        }
+                      }
+
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.of(context).pop(); // Return to previous screen
+                    } catch (error) {
+                      print('Error saving progress: $error');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to save progress')),
+                      );
+                    }
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Complete',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.green),
-              onPressed: () async {
-                if (isCorrect) {
-                  // Save progress to Firestore
-                  await FirebaseFirestore.instance
-                      .collection('functionActivities')
-                      .doc(userId)
-                      .collection(widget.courseName)
-                      .doc('Verbal Dyscalculia')
-                      .collection('solo_sessions')
-                      .doc('progress')
-                      .collection(getQuestionKey(widget.index))
-                      .doc('status')
-                      .set({
-                    'completed': true,
-                    'isCorrect': true,
-                    'timeTaken': _timeElapsed,
-                  }, SetOptions(merge: true));
-
-                  if (widget.index == '2') {
-                    FirebaseFirestore.instance
-                        .collection('functionActivities')
-                        .doc(userId)
-                        .collection(widget.courseName)
-                        .doc('Verbal Dyscalculia')
-                        .collection('solo_sessions')
-                        .doc('progress')
-                        .set({
-                          'completed': true,
-                          'isCorrect': true,
-                          'timeTaken': _timeElapsed,
-                        }, SetOptions(merge: true))
-                        .then((_) => print('Progress saved to Firestore'))
-                        .catchError((error) =>
-                            print('Failed to save progress: $error'));
-                  }
-                } else {
-                  await FirebaseFirestore.instance
-                      .collection('functionActivities')
-                      .doc(userId)
-                      .collection(widget.courseName)
-                      .doc('Verbal Dyscalculia')
-                      .collection('solo_sessions')
-                      .doc('progress')
-                      .collection(getQuestionKey(widget.index))
-                      .doc('status')
-                      .set({
-                    'completed': true,
-                    'isCorrect': false,
-                    'timeTaken': _timeElapsed,
-                  }, SetOptions(merge: true));
-
-                  if (widget.index == '2') {
-                    FirebaseFirestore.instance
-                        .collection('functionActivities')
-                        .doc(userId)
-                        .collection(widget.courseName)
-                        .doc('Verbal Dyscalculia')
-                        .collection('solo_sessions')
-                        .doc('progress')
-                        .set({
-                          'completed': true,
-                          'isCorrect': false,
-                          'timeTaken': _timeElapsed,
-                        }, SetOptions(merge: true))
-                        .then((_) => print('Progress saved to Firestore'))
-                        .catchError((error) =>
-                            print('Failed to save progress: $error'));
-                  }
-                }
-                if (isCorrect) {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                } else {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text(
-                'Complete',
-                style: TextStyle(fontSize: 16),
-              ),
-            )
-          ],
         );
       },
     );
@@ -439,7 +627,7 @@ class _SoloVerbalSessionScreenState
                     const SizedBox(height: 20),
                     _buildQuestionCard(themeColor),
                     const Spacer(),
-                    _buildControlButtons(themeColor, user.uid),
+                    _buildControlButtons(themeColor),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -459,107 +647,225 @@ class _SoloVerbalSessionScreenState
     );
   }
 
-  Widget _buildQuestionCard(Color themeColor) {
-    // Use the question from props
-    final currentQuestion = widget.questions[_currentQuestionIndex];
+  // Add helper method to format verbal questions based on operation
+String _formatVerbalQuestion(String operation, String question) {
+  switch (operation.toUpperCase()) {
+    case 'ADDITION':
+      return question.replaceAll('+', 'plus');
+    case 'SUBTRACTION':
+      return question.replaceAll('-', 'minus');
+    case 'MULTIPLICATION':
+      return question.replaceAll('×', 'times');
+    case 'DIVISION':
+      return question.replaceAll('÷', 'divided by');
+    default:
+      return question;
+  }
+}
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 5,
-            blurRadius: 7,
-            offset: const Offset(0, 3),
+  Widget _buildQuestionCard(Color themeColor) {
+    final currentQuestion = widget.questions[_currentQuestionIndex];
+    final formattedQuestion = _formatVerbalQuestion(
+      widget.courseName,
+      currentQuestion['question'],
+    );
+
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 5,
+                blurRadius: 7,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            currentQuestion['question'],
+          child: Text(
+            formattedQuestion,
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
+        ),
+        if (_transcribedText.isNotEmpty) ...[
           const SizedBox(height: 20),
-          if (_transcribedText.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.only(bottom: 20),
+          AnimatedOpacity(
+            opacity: _transcribedText.isEmpty ? 0.0 : 1.0,
+            duration: const Duration(milliseconds: 500),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
                 color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-              child: Text(
-                'Your answer: $_transcribedText',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlButtons(Color themeColor, String userId) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.withOpacity(0.1),
-              foregroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30)),
-            ),
-            onPressed: _speakQuestion,
-            icon: Icon(_isSpeaking ? Icons.pause : Icons.play_arrow),
-            label: Text(_isSpeaking ? 'Stop' : 'Listen'),
-          ),
-          GestureDetector(
-            onTapDown: (_) {
-              if (!_isStoppingRecording && !_isProcessing) {
-                _startRecording();
-              }
-            },
-            onTapUp: (_) {
-              if (_isRecording && !_isStoppingRecording) {
-                _stopRecording(userId);
-              }
-            },
-            onTapCancel: () {
-              if (_isRecording && !_isStoppingRecording) {
-                _stopRecording(userId);
-              }
-            },
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _isRecording ? Colors.red : themeColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: (_isRecording ? Colors.red : themeColor)
-                        .withOpacity(0.3),
-                    spreadRadius: 5,
-                    blurRadius: 7,
-                    offset: const Offset(0, 3),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.record_voice_over, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          'Your Answer:',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(15),
+                        bottomRight: Radius.circular(15),
+                      ),
+                      border: Border.all(
+                        color: Colors.grey.withOpacity(0.2),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _transcribedText.isEmpty ? 'Your answer will appear here...' : _transcribedText,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w500,
+                        color: _transcribedText.isEmpty ? Colors.grey : Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ],
               ),
-              child: Icon(
-                _isRecording ? Icons.mic : Icons.mic_none,
-                color: Colors.white,
-                size: 40,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildControlButtons(Color themeColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          // Recording status indicator
+          if (_isRecording || _isProcessing)
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isRecording ? Colors.red.withOpacity(0.1) : Colors.grey[100],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isRecording ? Icons.mic : Icons.mic_off,
+                    color: _isRecording ? Colors.red : Colors.grey,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isProcessing ? 'Processing...' : 'Recording...',
+                    style: TextStyle(
+                      color: _isRecording ? Colors.red : Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.withOpacity(0.1),
+                  foregroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
+                ),
+                onPressed: _speakQuestion,
+                icon: Icon(_isSpeaking ? Icons.pause : Icons.play_arrow),
+                label: Text(_isSpeaking ? 'Stop' : 'Listen'),
+              ),
+              GestureDetector(
+                onTapDown: (_) {
+                  if (!_isStoppingRecording && !_isProcessing) {
+                    _startRecording();
+                  }
+                },
+                onTapUp: (_) {
+                  if (_isRecording && !_isStoppingRecording) {
+                    _stopRecording();
+                  }
+                },
+                onTapCancel: () {
+                  if (_isRecording && !_isStoppingRecording) {
+                    _stopRecording();
+                  }
+                },
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isRecording ? Colors.red : themeColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_isRecording ? Colors.red : themeColor)
+                            .withOpacity(0.3),
+                        spreadRadius: 5,
+                        blurRadius: 7,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _isRecording ? Icons.mic : Icons.mic_none,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

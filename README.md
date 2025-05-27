@@ -1,3 +1,5 @@
+# **Project Giggle Mobile App Setup Guide**
+
 Welcome to the setup guide for Project Giggle. This document will walk you through the process of setting up your development environment, cloning the project, and running the app.
 
 ## 01. Prerequisites
@@ -109,50 +111,50 @@ Launch the New Emulator: In the AVD Manager, start your new 'Pixel 6a API 33' em
 
 ## 07. **Setting Up Flutter in VSCode(recommended code editor) with Android Studio Emulator:**
 
-[1] **Install Flutter and Dart Plugins in VSCode:**
+1. **Install Flutter and Dart Plugins in VSCode:**
 
 1. Download and install [Visual Studio Code](https://code.visualstudio.com/) and Open VSCode
-2. Go to the Extensions view by clicking on the square icon in the sidebar or pressing Ctrl+Shift+X.
-3. Search for 'Flutter' and install the Flutter plugin. This should automatically install the Dart plugin as well.
+1. Go to the Extensions view by clicking on the square icon in the sidebar or pressing Ctrl+Shift+X.
+1. Search for 'Flutter' and install the Flutter plugin. This should automatically install the Dart plugin as well.
 
-[2] **Verify Flutter Installation:**
+1. **Verify Flutter Installation:**
 
 1. Open a new terminal in VSCode (Terminal \> New Terminal).
-2. Run flutter doctor to check if there are any dependencies you need to install. Follow any instructions given.
+1. Run flutter doctor to check if there are any dependencies you need to install. Follow any instructions given.
 
-[3] **Install Android Studio (If Not Already Installed):**
+1. **Install Android Studio (If Not Already Installed):**
 
 1. Download Android Studio from the official website.
-2. Follow the below installation instructions.
+1. Follow the below installation instructions.
 
-[4] **Set Up the Android Emulator in Android Studio(If Not Already Setuped)::**
+1. **Set Up the Android Emulator in Android Studio(If Not Already Setuped)::**
 
 1. Open Android Studio.
-2. Go to the AVD Manager (Android Virtual Device Manager).
-3. Create a new device (e.g., Pixel 6a) with your desired API (e.g., API 33 - Tiramisu).
-4. Ensure you have downloaded the necessary system images and configurations.
+1. Go to the AVD Manager (Android Virtual Device Manager).
+1. Create a new device (e.g., Pixel 6a) with your desired API (e.g., API 33 - Tiramisu).
+1. Ensure you have downloaded the necessary system images and configurations.
 
-[5] **Start the Android Emulator:**
+1. **Start the Android Emulator:**
 
 1. From the AVD Manager, start the emulator you set up.
-2. Keep the emulator running.
+1. Keep the emulator running.
 
-[6] **Configure Flutter and Dart in VSCode:**
+1. **Configure Flutter and Dart in VSCode:**
 
 1. Open your Flutter project in VSCode.
-2. Ensure that the flutter and dart SDK paths are correctly set in the settings (if they are not automatically detected).
+1. Ensure that the flutter and dart SDK paths are correctly set in the settings (if they are not automatically detected).
 
-[7] **Run Flutter App in Emulator:**
+1. **Run Flutter App in Emulator:**
 
 1. Open the command palette in VSCode (View \> Command Palette or Ctrl+Shift+P).
-2. Type 'Flutter: Launch Emulator' and select the running emulator.
-3. Once the emulator is selected and running, open the command palette again and run 'Flutter: Run Flutter Project in Current Directory'.
+1. Type 'Flutter: Launch Emulator' and select the running emulator.
+1. Once the emulator is selected and running, open the command palette again and run 'Flutter: Run Flutter Project in Current Directory'.
 
-[8] **Debugging and Hot Reload:**
+1. **Debugging and Hot Reload:**
 
 1. VSCode will now build your Flutter app and install it on the emulator.
-2. You can use VSCode's debugging tools to set breakpoints, inspect variables, and more.
-3. Use the 'Hot Reload' feature by saving your files or using the appropriate command to see changes in real-time on the emulator.
+1. You can use VSCode's debugging tools to set breakpoints, inspect variables, and more.
+1. Use the 'Hot Reload' feature by saving your files or using the appropriate command to see changes in real-time on the emulator.
 
 ## 08. **Set up Android licenses**
 
@@ -177,4 +179,12 @@ Before proceeding, it's important to ensure that your environment is correctly s
 
 ## 10. Troubleshooting
 
-If you encounter any issues, refer to the [Flutter documentation](https://flutter.dev/docs/get-started/install) and [Firebase documentation](https://firebase.google.com/docs).
+If you encounter any issues, refer to the [Flutter documentation](https://flutter.dev/docs/get-started/install) and [Firebase documentation](https://firebase.google.com/docs). You can also seek help from your development team.
+
+## 11. Contact
+
+Praveen Aththanayake
+
+[praveen@silverlineit.co](mailto:praveen@silverlineit.co)
+
+[aththanayakempa@gmail.com](mailto:aththanayakempa@gmail.com)

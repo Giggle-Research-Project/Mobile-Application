@@ -12,6 +12,7 @@ import 'package:giggle/core/models/teacher_model.dart';
 import 'package:giggle/core/providers/theme_provider.dart';
 import 'package:giggle/core/services/predict_handwriting.service.dart';
 import 'package:giggle/core/widgets/sub_page_header.widget.dart';
+import 'package:giggle/features/function%2003/services/procedural_question_generator.dart';
 import 'package:giggle/features/function%2003/widgets/writing_painter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -20,7 +21,6 @@ import 'widgets/f3_widets.dart';
 class ProceduralInteractiveSession extends ConsumerStatefulWidget {
   final Map<String, String>? difficultyLevels;
   final String dyscalculiaType;
-  final String selectedTeacher;
   final String courseName;
   final List<Map<String, dynamic>> questions;
   final String userId;
@@ -29,7 +29,6 @@ class ProceduralInteractiveSession extends ConsumerStatefulWidget {
     Key? key,
     this.difficultyLevels,
     required this.dyscalculiaType,
-    required this.selectedTeacher,
     required this.courseName,
     required this.questions,
     required this.userId,
@@ -55,8 +54,6 @@ class _ProceduralInteractiveSessionState
   Map<String, String?> userEnteredValues = {};
   Map<String, bool> validationResults = {};
 
-  late TeacherCharacter selectedTeacher;
-
   // Keys for each editable square
   final GlobalKey _firstDigitKey = GlobalKey();
   final GlobalKey _secondDigitKey = GlobalKey();
@@ -65,40 +62,156 @@ class _ProceduralInteractiveSessionState
   final GlobalKey _answerFirstDigitKey = GlobalKey();
   final GlobalKey _answerSecondDigitKey = GlobalKey();
 
+  // Add new state variables
+  bool _isPredicting = false;
+  Map<String, String> _predictedDigits = {};
+
+  int _currentQuestionIndex = 0;
+  List<Map<String, dynamic>> _questionSet = [];
+  List<bool> _questionResults = [false, false, false];
+
+  // Add these state variables
+  bool _isLoading = true;
+  String? _loadingError;
+
+  // Add this as a class variable
+  String _currentPerformance = 'poor';
+
   @override
   void initState() {
     super.initState();
     _startTimer();
-    _generateProblem();
-    _initializeSquares();
-    selectedTeacher = teachers.firstWhere(
-      (teacher) => teacher.name == widget.selectedTeacher,
-      orElse: () => teachers[0],
-    );
+    _initializeSession();
   }
 
-  void _generateProblem() {
-    firstNumber = widget.questions[0]['num1'];
-    secondNumber = widget.questions[0]['num2'];
+  // Add new method to handle initialization
+  Future<void> _initializeSession() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _loadingError = null;
+      });
 
-    if (widget.courseName == 'Addition') {
-      correctAnswer = firstNumber + secondNumber;
-    } else if (widget.courseName == 'Subtraction') {
-      correctAnswer = firstNumber - secondNumber;
-    } else if (widget.courseName == 'Multiplication') {
-      correctAnswer = firstNumber * secondNumber;
-    } else if (widget.courseName == 'Division') {
-      correctAnswer = firstNumber ~/ secondNumber;
+      await _setupQuestions();
+      _generateCurrentProblem();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error initializing session: $e');
+      setState(() {
+        _isLoading = false;
+        _loadingError = 'Failed to load questions. Please try again.';
+      });
     }
+  }
 
-    validationResults = {
-      'first_digit': true,
-      'second_digit': true,
-      'third_digit': true,
-      'fourth_digit': true,
-      'answer_first_digit': true,
-      'answer_second_digit': true,
+  // Update the _getUserPerformance method to store the performance
+  Future<String> _getUserPerformance() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('skill_assessment')
+          .doc(widget.userId)
+          .collection('TestScreenType.skillAssessment')
+          .doc('TestScreenType.skillAssessment')
+          .get();
+
+      if (!doc.exists) {
+        _currentPerformance = 'poor';
+        return 'poor';
+      }
+
+      final overallScore = doc.data()?['overallScore'] as num? ?? 0;
+
+      if (overallScore >= 75) {
+        _currentPerformance = 'hard';
+        return 'hard';
+      } else if (overallScore >= 40) {
+        _currentPerformance = 'medium';
+        return 'medium';
+      } else {
+        _currentPerformance = 'poor';
+        return 'poor';
+      }
+    } catch (e) {
+      print('Error getting user performance: $e');
+      _currentPerformance = 'poor';
+      return 'poor'; // Default to poor on error
+    }
+  }
+
+  // Modify _setupQuestions to handle errors properly
+  Future<void> _setupQuestions() async {
+    try {
+      final performance = await _getUserPerformance();
+      List<MathQuestion> questions = QuestionGenerator.generateQuestionSet(widget.courseName);
+
+      // Filter questions based on performance level
+      switch (performance) {
+        case 'hard':
+          _questionSet = [_convertQuestionToMap(questions[2])]; // Only hard
+          _questionResults = [false];
+          break;
+        case 'medium':
+          _questionSet = [
+            _convertQuestionToMap(questions[1]),
+            _convertQuestionToMap(questions[2])
+          ]; // Medium and hard
+          _questionResults = [false, false];
+          break;
+        default:
+          _questionSet = questions.map((q) => _convertQuestionToMap(q)).toList();
+          _questionResults = List.filled(questions.length, false);
+          break;
+      }
+    } catch (e) {
+      print('Error in _setupQuestions: $e');
+      throw Exception('Failed to setup questions: $e');
+    }
+  }
+
+  // Helper method to convert MathQuestion to Map
+  Map<String, dynamic> _convertQuestionToMap(MathQuestion question) {
+    return {
+      'num1': question.num1,
+      'num2': question.num2,
+      'answer': question.answer,
+      'difficulty': question.difficulty,
     };
+  }
+
+  void _generateCurrentProblem() {
+    final currentQuestion = _questionSet[_currentQuestionIndex];
+    firstNumber = currentQuestion['num1'];
+    secondNumber = currentQuestion['num2'];
+    correctAnswer = currentQuestion['answer']; // Use pre-calculated answer
+
+    _initializeSquares();
+
+    // Validate the answer based on operation type
+    assert(() {
+      int expectedAnswer;
+      switch (widget.courseName) {
+        case 'Addition':
+          expectedAnswer = firstNumber + secondNumber;
+          break;
+        case 'Subtraction':
+          expectedAnswer = firstNumber - secondNumber;
+          break;
+        case 'Multiplication':
+          expectedAnswer = firstNumber * secondNumber;
+          break;
+        case 'Division':
+          expectedAnswer = firstNumber ~/ secondNumber;
+          break;
+        default:
+          expectedAnswer = correctAnswer;
+      }
+      assert(correctAnswer == expectedAnswer, 
+        'Answer mismatch for ${widget.courseName}: expected $expectedAnswer but got $correctAnswer');
+      return true;
+    }());
   }
 
   void _initializeSquares() {
@@ -249,6 +362,18 @@ class _ProceduralInteractiveSessionState
     }
   }
 
+  void _clearAllWriting() {
+    setState(() {
+      for (var square in _squares) {
+        if (square['editable'] == true) {
+          square['paths'] = <List<Offset>>[];
+        }
+      }
+      // Optionally reset validation results
+      validationResults.updateAll((key, value) => true);
+    });
+  }
+
   Future<String?> captureAndPredictDigit(
       GlobalKey key, String identifier) async {
     final file = await captureSquare(key, identifier);
@@ -271,157 +396,80 @@ class _ProceduralInteractiveSessionState
       });
 
       // Capture and predict all digits
-      final firstDigit =
-          await captureAndPredictDigit(_firstDigitKey, 'first_digit');
-      final secondDigit =
-          await captureAndPredictDigit(_secondDigitKey, 'second_digit');
-      final thirdDigit =
-          await captureAndPredictDigit(_thirdDigitKey, 'third_digit');
-      final fourthDigit =
-          await captureAndPredictDigit(_fourthDigitKey, 'fourth_digit');
-      final answerFirstDigit = await captureAndPredictDigit(
-          _answerFirstDigitKey, 'answer_first_digit');
-      final answerSecondDigit = await captureAndPredictDigit(
-          _answerSecondDigitKey, 'answer_second_digit');
-
-      // Store the user inputs for validation
-      userEnteredValues = {
-        'first_digit': firstDigit,
-        'second_digit': secondDigit,
-        'third_digit': thirdDigit,
-        'fourth_digit': fourthDigit,
-        'answer_first_digit': answerFirstDigit,
-        'answer_second_digit': answerSecondDigit,
-      };
-
-      print('First number: ${(firstDigit ?? '') + (secondDigit ?? '')}');
-      print('Second number: ${(thirdDigit ?? '') + (fourthDigit ?? '')}');
-      print(
-          'User answer: ${(answerFirstDigit ?? '') + (answerSecondDigit ?? '')}');
+      final firstDigit = await captureAndPredictDigit(_firstDigitKey, 'first_digit');
+      final secondDigit = await captureAndPredictDigit(_secondDigitKey, 'second_digit');
+      final thirdDigit = await captureAndPredictDigit(_thirdDigitKey, 'third_digit');
+      final fourthDigit = await captureAndPredictDigit(_fourthDigitKey, 'fourth_digit');
+      final answerFirstDigit = await captureAndPredictDigit(_answerFirstDigitKey, 'answer_first_digit');
+      final answerSecondDigit = await captureAndPredictDigit(_answerSecondDigitKey, 'answer_second_digit');
 
       // Format the inputs correctly based on number of digits
-      String formattedFirstNumber = "";
-      String formattedSecondNumber = "";
-      String formattedUserAnswer = "";
+      String formattedFirstNumber = firstNumber < 10 
+          ? (secondDigit ?? '') 
+          : (firstDigit ?? '') + (secondDigit ?? '');
 
-      // Handle first number (could be 1 or 2 digits)
-      if (firstNumber < 10) {
-        // Single digit number - should be in second position only
-        formattedFirstNumber = (secondDigit ?? '');
-      } else {
-        // Double digit number
-        formattedFirstNumber = (firstDigit ?? '') + (secondDigit ?? '');
-      }
+      String formattedSecondNumber = secondNumber < 10 
+          ? (fourthDigit ?? '') 
+          : (thirdDigit ?? '') + (fourthDigit ?? '');
 
-      // Handle second number (could be 1 or 2 digits)
-      if (secondNumber < 10) {
-        // Single digit number - should be in fourth position only
-        formattedSecondNumber = (fourthDigit ?? '');
-      } else {
-        // Double digit number
-        formattedSecondNumber = (thirdDigit ?? '') + (fourthDigit ?? '');
-      }
-
-      // Handle answer (could be 1, 2, or 3 digits)
-      if (answerFirstDigit == '0' || answerFirstDigit == '') {
-        formattedUserAnswer = (answerSecondDigit ?? '');
-      } else {
-        formattedUserAnswer =
-            (answerFirstDigit ?? '') + (answerSecondDigit ?? '');
-      }
+      String formattedUserAnswer = correctAnswer < 10 
+          ? (answerSecondDigit ?? '') 
+          : (answerFirstDigit ?? '') + (answerSecondDigit ?? '');
 
       // Parse the formatted numbers
       int? userFirstNumber = int.tryParse(formattedFirstNumber);
       int? userSecondNumber = int.tryParse(formattedSecondNumber);
       int? userAnswer = int.tryParse(formattedUserAnswer);
 
-      if (userFirstNumber == null ||
-          userSecondNumber == null ||
-          userAnswer == null) {
+      if (userFirstNumber == null || userSecondNumber == null || userAnswer == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text(
-                    'Could not recognize one or more digits. Please write more clearly.')),
+              content: Text('Could not recognize one or more digits. Please write more clearly.'),
+            ),
           );
         }
         return;
       }
 
-      // Validate if user wrote the correct numbers
-      bool isOperandCorrect =
-          userFirstNumber == firstNumber && userSecondNumber == secondNumber;
-      bool isAnswerCorrect = userAnswer == correctAnswer;
+      // Updated validation logic
+      bool numbersCorrect = userFirstNumber == firstNumber && userSecondNumber == secondNumber;
+      bool answerCorrect = userAnswer == correctAnswer;
+      bool isOperationCorrect = _validateOperation(userFirstNumber, userSecondNumber, userAnswer);
 
       // Update validation results
       setState(() {
         // For first operand
         if (firstNumber < 10) {
-          // Single digit
-          validationResults['first_digit'] =
-              firstDigit == '0' || firstDigit == '' || firstDigit == null;
-          validationResults['second_digit'] =
-              secondDigit == firstNumber.toString();
+          validationResults['first_digit'] = true;
+          validationResults['second_digit'] = userFirstNumber == firstNumber;
         } else {
-          // Double digit
-          validationResults['first_digit'] =
-              firstDigit == firstNumber.toString()[0];
-          validationResults['second_digit'] =
-              secondDigit == firstNumber.toString()[1];
+          validationResults['first_digit'] = firstDigit == firstNumber.toString()[0];
+          validationResults['second_digit'] = secondDigit == firstNumber.toString()[1];
         }
 
         // For second operand
         if (secondNumber < 10) {
-          // Single digit
-          validationResults['third_digit'] =
-              thirdDigit == '0' || thirdDigit == '' || thirdDigit == null;
-          validationResults['fourth_digit'] =
-              fourthDigit == secondNumber.toString();
+          validationResults['third_digit'] = true;
+          validationResults['fourth_digit'] = userSecondNumber == secondNumber;
         } else {
-          // Double digit
-          validationResults['third_digit'] =
-              thirdDigit == secondNumber.toString()[0];
-          validationResults['fourth_digit'] =
-              fourthDigit == secondNumber.toString()[1];
+          validationResults['third_digit'] = thirdDigit == secondNumber.toString()[0];
+          validationResults['fourth_digit'] = fourthDigit == secondNumber.toString()[1];
         }
 
         // For answer
         if (correctAnswer < 10) {
-          // Single digit answer
-          validationResults['answer_first_digit'] = answerFirstDigit == '0' ||
-              answerFirstDigit == '' ||
-              answerFirstDigit == null;
-          validationResults['answer_second_digit'] =
-              answerSecondDigit == correctAnswer.toString();
-        } else if (correctAnswer < 100) {
-          // Double digit answer
-          validationResults['answer_first_digit'] =
-              answerFirstDigit == correctAnswer.toString()[0];
-          validationResults['answer_second_digit'] =
-              answerSecondDigit == correctAnswer.toString()[1];
+          validationResults['answer_first_digit'] = true;
+          validationResults['answer_second_digit'] = userAnswer == correctAnswer;
         } else {
-          // Triple digit answer - need to handle separately if needed
-          validationResults['answer_first_digit'] =
-              answerFirstDigit == correctAnswer.toString()[0];
-          validationResults['answer_second_digit'] =
-              answerSecondDigit == correctAnswer.toString()[1];
+          validationResults['answer_first_digit'] = answerFirstDigit == correctAnswer.toString()[0];
+          validationResults['answer_second_digit'] = answerSecondDigit == correctAnswer.toString()[1];
         }
       });
 
       if (mounted) {
-        if (isOperandCorrect && isAnswerCorrect) {
+        if (numbersCorrect && answerCorrect && isOperationCorrect) {
           _showSuccessDialog();
-          await FirebaseFirestore.instance
-              .collection('functionActivities')
-              .doc(widget.userId)
-              .collection(widget.courseName)
-              .doc(widget.dyscalculiaType)
-              .collection('interactive_session')
-              .doc('progress')
-              .set({
-            'completed': true,
-            'timeElapsed': _timeElapsed,
-          }, SetOptions(merge: true));
         } else {
           _showErrorDialog();
         }
@@ -431,95 +479,174 @@ class _ProceduralInteractiveSessionState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Something went wrong. Please try again.')),
+            content: Text('Something went wrong. Please try again.'),
+          ),
         );
       }
     }
   }
 
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Great job!',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
+void _showSuccessDialog() {
+  if (!mounted) return;
+
+  final isLastQuestion = _currentQuestionIndex == _questionSet.length - 1;
+  final nextDifficulty = _currentQuestionIndex == 0 ? 'Medium' : 'Hard';
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        title: Text(
+          isLastQuestion ? 'Congratulations!' : 'Great job!',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: isLastQuestion ? Colors.green : Colors.blue,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isLastQuestion ? Icons.celebration : Icons.check_circle,
+              color: isLastQuestion ? Colors.green : Colors.blue,
+              size: 60,
             ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 60,
+            const SizedBox(height: 16),
+            Text(
+              isLastQuestion
+                  ? 'You\'ve completed all questions!'
+                  : 'Correct! Moving on to $nextDifficulty difficulty',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'You solved the problem correctly!',
-                style: TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              if (widget.courseName == 'Addition')
-                Text(
-                  '$firstNumber + $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              if (widget.courseName == 'Subtraction')
-                Text(
-                  '$firstNumber - $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              if (widget.courseName == 'Multiplication')
-                Text(
-                  '$firstNumber × $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              if (widget.courseName == 'Division')
-                Text(
-                  '$firstNumber ÷ $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.green,
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Complete', style: TextStyle(fontSize: 16)),
+              textAlign: TextAlign.center,
             ),
           ],
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: isLastQuestion ? Colors.green : Colors.blue,
+            ),
+            onPressed: () async {
+              // Close the dialog
+              Navigator.of(dialogContext).pop();
+
+              if (isLastQuestion) {
+                // Mark current question as complete
+                setState(() {
+                  _questionResults[_currentQuestionIndex] = true;
+                });
+
+                // Save completion status asynchronously but don't wait for it
+                _saveCompletionStatus().then((_) {
+                  if (mounted) {
+                    // Navigate back to the previous screen
+                    Navigator.of(context).pop(); // Pop first time
+                  }
+                }).catchError((e) {
+                  print('Error saving completion status: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to save progress, but session completed.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    // Navigate even if saving fails
+                    Navigator.of(context).pop(); // Pop first time
+                  }
+                });
+              } else {
+                // Move to next question
+                setState(() {
+                  _questionResults[_currentQuestionIndex] = true;
+                  _currentQuestionIndex++;
+                  _generateCurrentProblem();
+                  _clearAllWriting();
+                });
+              }
+            },
+            child: Text(
+              isLastQuestion ? 'Complete' : 'Next Question',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+  Future<void> _saveCompletionStatus() async {
+    try {
+      // Check if all questions are answered correctly
+      bool allQuestionsCorrect = 
+          _questionResults.every((result) => result == true);
+
+      if (allQuestionsCorrect) {
+        await FirebaseFirestore.instance
+            .collection('functionActivities')
+            .doc(widget.userId)
+            .collection(widget.courseName)
+            .doc(widget.dyscalculiaType)
+            .collection('interactive_session')
+            .doc('progress')
+            .set({
+          'completed': true,
+          'timeElapsed': _timeElapsed,
+          'questionResults': _questionResults,
+          'completedAt': FieldValue.serverTimestamp(),
+          'totalQuestions': _questionSet.length, // Add total questions count
+        }, SetOptions(merge: true));
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Progress saved successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Complete all questions correctly to save progress.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error saving completion status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save progress. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
-      },
-    );
+      }
+    }
+  }
+
+  String _getOperatorSymbol() {
+    switch (widget.courseName) {
+      case 'Addition':
+        return '+';
+      case 'Subtraction':
+        return '-';
+      case 'Multiplication':
+        return '×';
+      case 'Division':
+        return '÷';
+      default:
+        return '+';
+    }
   }
 
   void _showErrorDialog() {
@@ -527,6 +654,9 @@ class _ProceduralInteractiveSessionState
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
+        String operatorSymbol = _getOperatorSymbol();
+        String problem = '$firstNumber $operatorSymbol $secondNumber = $correctAnswer';
+
         return AlertDialog(
           title: const Text(
             'Try Again',
@@ -550,42 +680,14 @@ class _ProceduralInteractiveSessionState
                 style: TextStyle(fontSize: 16),
                 textAlign: TextAlign.center,
               ),
-              if (widget.courseName == 'Addition')
-                Text(
-                  'The correct problem is $firstNumber + $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
+              Text(
+                'The correct problem is $problem',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-              if (widget.courseName == 'Subtraction')
-                Text(
-                  'The correct problem is $firstNumber - $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              if (widget.courseName == 'Multiplication')
-                Text(
-                  'The correct problem is $firstNumber × $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              if (widget.courseName == 'Division')
-                Text(
-                  'The correct problem is $firstNumber ÷ $secondNumber = $correctAnswer',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
           actions: [
@@ -593,12 +695,46 @@ class _ProceduralInteractiveSessionState
               style: TextButton.styleFrom(
                 foregroundColor: Colors.blue,
               ),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Try Again', style: TextStyle(fontSize: 16)),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  void _predictAllDigits() {
+    // Format the numbers properly
+    String firstNumStr = firstNumber.toString().padLeft(2, '0');
+    String secondNumStr = secondNumber.toString().padLeft(2, '0');
+    String answerStr = correctAnswer.toString().padLeft(2, '0');
+
+    setState(() {
+      _isPredicting = false;
+      _predictedDigits = {
+        'first_digit': firstNumStr[0],
+        'second_digit': firstNumStr[1],
+        'third_digit': secondNumStr[0],
+        'fourth_digit': secondNumStr[1],
+        'answer_first_digit': answerStr[0],
+        'answer_second_digit': answerStr[1],
+      };
+    });
+
+    _showPredictionResultDialog();
+  }
+
+  void _showPredictionResultDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return PredictionResultsDialog(
+          predictedDigits: _predictedDigits,
+          firstNumber: firstNumber,
+          secondNumber: secondNumber,
+          correctAnswer: correctAnswer,
         );
       },
     );
@@ -612,49 +748,89 @@ class _ProceduralInteractiveSessionState
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Background Gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  themeColor.withOpacity(0.1),
-                  Colors.green.withOpacity(0.1),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : _loadingError != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _loadingError!,
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _initializeSession,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : Stack(
+                  children: [
+                    // Background Gradient
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            themeColor.withOpacity(0.1),
+                            Colors.green.withOpacity(0.1),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
 
-          // Content
-          SafeArea(
-            child: Column(
-              children: [
-                SubPageHeader(
-                  title: widget.courseName,
-                  desc: widget.courseName + " Exercise",
+                    // Content
+                    SafeArea(
+                      child: Column(
+                        children: [
+                          SubPageHeader(
+                            title: widget.courseName,
+                            desc:
+                                "${widget.courseName} Exercise",
+                          ),
+                          const SizedBox(height: 20),
+                          TeacherAndTimerWidget(
+                            timeRemaining: _timeElapsed,
+                            questions: _questionSet,
+                            currentQuestionIndex:
+                                _currentQuestionIndex, // Add this parameter
+                            performance: _currentPerformance, // Add this parameter
+                          ),
+                          const SizedBox(height: 30),
+                          const BuildQuestionWidget(),
+                          const SizedBox(height: 20),
+                          _buildAdditionGrid(),
+                          const Spacer(),
+                          _buildBottomButtons(themeColor),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                TeacherAndTimerWidget(
-                  selectedTeacher: selectedTeacher.name,
-                  avatar: selectedTeacher.avatar,
-                  timeRemaining: _timeElapsed,
-                ),
-                const SizedBox(height: 30),
-                const BuildQuestionWidget(),
-                const SizedBox(height: 20),
-                _buildAdditionGrid(),
-                const Spacer(),
-                _buildBottomButtons(themeColor),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
+  }
+
+  String _getDifficultyText() {
+    switch (_currentQuestionIndex) {
+      case 0:
+        return "Easy Level";
+      case 1:
+        return "Medium Level";
+      case 2:
+        return "Hard Level";
+      default:
+        return "Easy Level";
+    }
   }
 
   Widget _buildAdditionGrid() {
@@ -806,92 +982,91 @@ class _ProceduralInteractiveSessionState
     final isValid = validationResults[position] ?? true;
 
     return RepaintBoundary(
-      key: key,
-      child: AspectRatio(
-        aspectRatio: 1,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isValid ? Colors.blue.withOpacity(0.3) : Colors.red,
-              width: isValid ? 1 : 2,
+        key: key,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isValid ? Colors.blue.withOpacity(0.3) : Colors.red,
+                width: isValid ? 1 : 2,
+              ),
+              color: isValid ? Colors.white : Colors.red.withOpacity(0.1),
             ),
-            color: isValid ? Colors.white : Colors.red.withOpacity(0.1),
-          ),
-          child: Stack(
-            children: [
-              ClipRect(
-                child: GestureDetector(
-                  onPanDown: (details) {
-                    if (_isWithinBounds(details.localPosition)) {
-                      setState(() {
-                        square['paths'].add([details.localPosition]);
-                      });
-                    }
-                  },
-                  onPanUpdate: (details) {
-                    if (_isWithinBounds(details.localPosition)) {
-                      setState(() {
-                        if (square['paths'].isNotEmpty) {
-                          square['paths'].last.add(details.localPosition);
-                        }
-                      });
-                    }
-                  },
-                  onPanEnd: (details) {
-                    if (square['paths'].isNotEmpty &&
-                        square['paths'].last.length < 2) {
-                      setState(() {
-                        square['paths'].removeLast();
-                      });
-                    }
-                  },
-                  onDoubleTap: () {
-                    _clearWriting(index);
-                  },
-                  child: CustomPaint(
-                    painter: WritingPainter(
-                      paths: square['paths'],
-                      color: color,
-                      strokeWidth: 4.5,
+            child: Stack(
+              children: [
+                ClipRect(
+                  child: GestureDetector(
+                    onPanDown: (details) {
+                      if (_isWithinBounds(details.localPosition)) {
+                        setState(() {
+                          square['paths'].add([details.localPosition]);
+                        });
+                      }
+                    },
+                    onPanUpdate: (details) {
+                      if (_isWithinBounds(details.localPosition)) {
+                        setState(() {
+                          if (square['paths'].isNotEmpty) {
+                            square['paths'].last.add(details.localPosition);
+                          }
+                        });
+                      }
+                    },
+                    onPanEnd: (details) {
+                      if (square['paths'].isNotEmpty &&
+                          square['paths'].last.length < 2) {
+                        setState(() {
+                          square['paths'].removeLast();
+                        });
+                      }
+                    },
+                    onDoubleTap: () {
+                      _clearWriting(index);
+                    },
+                    child: CustomPaint(
+                      painter: WritingPainter(
+                        paths: square['paths'],
+                        color: color,
+                        strokeWidth: 4.5,
+                      ),
+                      size: Size.infinite,
                     ),
-                    size: Size.infinite,
                   ),
                 ),
-              ),
 
-              // Show expected value if validation failed
-              // Show expected value if validation failed
-              if (!isValid && userEnteredValues[position] != null)
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _getExpectedValue(position),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                // Show expected value if validation failed
+                // Show expected value if validation failed
+                if (!isValid && userEnteredValues[position] != null)
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _getExpectedValue(position),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 
   String _getExpectedValue(String position) {
     // For first number
     if (position == 'first_digit') {
-      return firstNumber < 10 ? "" : firstNumber.toString()[0];
+      return firstNumber < 10 ? "0" : firstNumber.toString()[0];
     } else if (position == 'second_digit') {
       return firstNumber < 10
           ? firstNumber.toString()
@@ -900,7 +1075,7 @@ class _ProceduralInteractiveSessionState
 
     // For second number
     else if (position == 'third_digit') {
-      return secondNumber < 10 ? "" : secondNumber.toString()[0];
+      return secondNumber < 10 ? "0" : secondNumber.toString()[0];
     } else if (position == 'fourth_digit') {
       return secondNumber < 10
           ? secondNumber.toString()
@@ -909,7 +1084,7 @@ class _ProceduralInteractiveSessionState
 
     // For answer
     else if (position == 'answer_first_digit') {
-      return correctAnswer < 10 ? "" : correctAnswer.toString()[0];
+      return correctAnswer < 10 ? "0" : correctAnswer.toString()[0];
     } else if (position == 'answer_second_digit') {
       return correctAnswer < 10
           ? correctAnswer.toString()
@@ -935,70 +1110,251 @@ class _ProceduralInteractiveSessionState
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Clear All Button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.withOpacity(0.1),
-              foregroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 15,
+          Expanded(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: _clearAllWriting,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-            onPressed: () {
-              setState(() {
-                for (var square in _squares) {
-                  if (square['editable'] == true) {
-                    square['paths'] = <List<Offset>>[];
-                  }
-                }
-                // Reset validation
-                validationResults = {
-                  'first_digit': true,
-                  'second_digit': true,
-                  'third_digit': true,
-                  'fourth_digit': true,
-                  'answer_first_digit': true,
-                  'answer_second_digit': true,
-                };
-              });
-            },
-            child: const Text(
-              'Clear All',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
+              label: const Text(
+                'Clear All',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
-
-          // Check Answer Button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: themeColor,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 40,
-                vertical: 15,
+          const SizedBox(width: 16),
+          // Predict Digits Button
+          Expanded(
+            child: ElevatedButton.icon(
+              icon: _isPredicting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ))
+                  : const Icon(Icons.precision_manufacturing,
+                      color: Colors.white),
+              onPressed: _isPredicting ? null : _predictAllDigits,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+              label: Text(
+                _isPredicting ? 'Predicting...' : 'Predict Digits',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            onPressed: _checkAnswer,
-            child: const Text(
-              'Check Answer',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
+          ),
+          const SizedBox(width: 16),
+          // Check Answer Button
+          Expanded(
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.check_circle, color: Colors.white),
+              onPressed: _checkAnswer,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: themeColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              label: const Text(
+                'Check Answer',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  bool _validateOperation(int userFirstNumber, int userSecondNumber, int userAnswer) {
+    switch (widget.courseName) {
+      case 'Addition':
+        return userAnswer == userFirstNumber + userSecondNumber;
+      case 'Subtraction':
+        return userAnswer == userFirstNumber - userSecondNumber;
+      case 'Multiplication':
+        return userAnswer == userFirstNumber * userSecondNumber;
+      case 'Division':
+        return userAnswer == userFirstNumber ~/ userSecondNumber;
+      default:
+        return false;
+    }
+  }
+}
+
+// Add at the end of the file
+
+class PredictionResultsDialog extends StatelessWidget {
+  final Map<String, String> predictedDigits;
+  final int firstNumber;
+  final int secondNumber;
+  final int correctAnswer;
+
+  const PredictionResultsDialog({
+    Key? key,
+    required this.predictedDigits,
+    required this.firstNumber,
+    required this.secondNumber,
+    required this.correctAnswer,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 12,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              Colors.blue.shade50,
+              Colors.blue.shade100,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Digit Recognition',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildPredictionGrid(),
+            const SizedBox(height: 24),
+            Text(
+              'These are the expected digits for the problem.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade600,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Understood',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPredictionGrid() {
+    final digitPositions = [
+      {'key': 'first_digit', 'label': 'First Digit'},
+      {'key': 'second_digit', 'label': 'Second Digit'},
+      {'key': 'third_digit', 'label': 'Third Digit'},
+      {'key': 'fourth_digit', 'label': 'Fourth Digit'},
+      {'key': 'answer_first_digit', 'label': 'Answer First Digit'},
+      {'key': 'answer_second_digit', 'label': 'Answer Second Digit'},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.5,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: digitPositions.length,
+      itemBuilder: (context, index) {
+        final position = digitPositions[index];
+        final digit = predictedDigits[position['key']] ?? '0';
+
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.shade100,
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                position['label']!,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                digit,
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

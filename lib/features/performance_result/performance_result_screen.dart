@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:giggle/core/widgets/bg_pattern.dart';
 import 'package:giggle/core/widgets/sub_page_header.widget.dart';
 
 class PerformanceResultScreen extends StatefulWidget {
   final double score;
   final String timeSpent;
+  final int skillCorrectAnswers;
+  final int skillTotalQuestions;
   final int correctAnswers;
   final int totalQuestions;
   final Map<String, double> categoryLevels;
@@ -22,6 +23,8 @@ class PerformanceResultScreen extends StatefulWidget {
     Key? key,
     required this.score,
     required this.timeSpent,
+    required this.skillCorrectAnswers,
+    required this.skillTotalQuestions,
     required this.correctAnswers,
     required this.totalQuestions,
     required this.categoryLevels,
@@ -68,6 +71,27 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
     }
 
     return organized;
+  }
+
+  String _formatTimeDisplay(String timeSpent) {
+    // Check if the timeSpent contains "min"
+    if (timeSpent.contains("min")) {
+      // Split the string to get minutes and seconds
+      final parts = timeSpent.split(" ");
+      final minutes = int.tryParse(parts[0]) ?? 0;
+      final seconds = int.tryParse(parts[2].replaceAll("sec", "")) ?? 0;
+      
+      // If minutes is 0, only show seconds
+      if (minutes == 0) {
+        return "$seconds sec";
+      }
+      
+      // Otherwise show both minutes and seconds
+      return timeSpent;
+    }
+    
+    // If only seconds, return as is
+    return timeSpent;
   }
 
   @override
@@ -135,17 +159,8 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
       ),
       child: Column(
         children: [
-          _buildScoreRing(),
-          const SizedBox(height: 24),
-          Text(
-            _getPerformanceMessage(),
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1D1D1F),
-            ),
-          ),
-          const SizedBox(height: 8),
+          _buildPerformanceEmoji(),
+          const SizedBox(height: 15),
           Text(
             _getPerformanceDescription(),
             textAlign: TextAlign.center,
@@ -159,43 +174,81 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
     ).animate().fadeIn().scale();
   }
 
-  Widget _buildScoreRing() {
+  Widget _buildPerformanceEmoji() {
     final Color scoreColor = _getScoreColor();
-    return Stack(
-      alignment: Alignment.center,
+    final String performanceLevel = _getPerformanceLevel();
+    final String emoji = _getPerformanceEmoji();
+    
+    return Column(
       children: [
-        SizedBox(
-          width: 160,
-          height: 160,
-          child: CircularProgressIndicator(
-            value: widget.score / 100,
-            strokeWidth: 12,
-            backgroundColor: const Color(0xFFE5E5EA),
-            valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+        Text(
+          emoji,
+          style: const TextStyle(fontSize: 64),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Performance',
+          style: TextStyle(
+            fontSize: 16,
+            color: const Color(0xFF1D1D1F).withOpacity(0.6),
           ),
         ),
-        Column(
-          mainAxisSize: MainAxisSize.min,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '${widget.score.toStringAsFixed(1)}%',
-              style: const TextStyle(
-                fontSize: 40,
+              widget.score.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1D1D1F),
+                color: scoreColor,
               ),
             ),
             Text(
-              'Score',
+              '%',
               style: TextStyle(
-                fontSize: 16,
-                color: const Color(0xFF1D1D1F).withOpacity(0.6),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: scoreColor,
               ),
             ),
           ],
         ),
+        Text(
+          performanceLevel,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+            color: scoreColor.withOpacity(0.8),
+          ),
+        ),
       ],
     ).animate().scale(delay: 400.ms);
+  }
+
+  String _getPerformanceLevel() {
+    if (widget.score >= 90) return 'Excellent';
+    if (widget.score >= 80) return 'Great';
+    if (widget.score >= 70) return 'Good';
+    if (widget.score >= 60) return 'Fair';
+    return 'Needs Improvement';
+  }
+
+
+  int _getStarCount() {
+    if (widget.score >= 90) return 5;
+    if (widget.score >= 80) return 4;
+    if (widget.score >= 70) return 3;
+    if (widget.score >= 60) return 2;
+    return 1;
+  }
+
+  String _getPerformanceEmoji() {
+    if (widget.score >= 90) return '🤩';
+    if (widget.score >= 80) return '😊';
+    if (widget.score >= 70) return '🙂';
+    if (widget.score >= 60) return '🤔';
+    return '😐';
   }
 
   Widget _buildDetailedStats() {
@@ -217,7 +270,7 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Detailed Statistics',
+            'Skill Assessment Statistics',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -231,20 +284,26 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
               _buildStatItem(
                 icon: Icons.timer_outlined,
                 label: 'Time Taken',
-                value: widget.timeSpent,
+                value: _formatTimeDisplay(widget.timeSpent),
                 color: const Color(0xFF5856D6),
               ),
               _buildStatItem(
                 icon: Icons.check_circle_outline,
                 label: 'Correct',
-                value: '${widget.correctAnswers}/${widget.totalQuestions}',
+                value: widget.skillCorrectAnswers.toString(),
                 color: const Color(0xFF34C759),
+              ),
+              _buildStatItem(
+                icon: Icons.cancel_outlined,
+                label: 'Incorrect',
+                value: (widget.skillTotalQuestions - widget.skillCorrectAnswers).toString(),
+                color: const Color(0xFFFF3B30),
               ),
               _buildStatItem(
                 icon: Icons.trending_up,
                 label: 'Accuracy',
                 value:
-                    '${(widget.correctAnswers / widget.totalQuestions * 100).toStringAsFixed(1)}%',
+                    '${(widget.skillCorrectAnswers / widget.skillTotalQuestions * 100).toStringAsFixed(1)}%',
                 color: const Color(0xFFFF9500),
               ),
             ],
@@ -309,7 +368,7 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Evaluation Statistics',
+            'Category Performance',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -317,97 +376,75 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          SizedBox(
-            height: 200,
-            child: Stack(
-              children: [
-                PieChart(
-                  PieChartData(
-                    sections: [
-                      PieChartSectionData(
-                        color: const Color(0xFF9CCC65),
-                        value: widget.categoryLevels['procedural'] ?? 0,
-                        title: 'Procedural',
-                        radius: 60,
-                        titleStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      PieChartSectionData(
-                        color: const Color(0xFF4DD0E1),
-                        value: widget.categoryLevels['semantic'] ?? 0,
-                        title: 'Semantic',
-                        radius: 60,
-                        titleStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      PieChartSectionData(
-                        color: const Color(0xFF4FC3F7),
-                        value: widget.categoryLevels['verbal'] ?? 0,
-                        title: 'Verbal',
-                        radius: 60,
-                        titleStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 40,
-                  ),
-                ),
-                Center(
-                  child: Text(
-                    'Category\nLevel',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black.withOpacity(0.6),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          _buildCategoryBar(
+            'Procedural',
+            widget.categoryLevels['procedural'] ?? 0,
+            const Color(0xFF9CCC65),
           ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildLegendItem('Procedural', const Color(0xFF9CCC65)),
-              _buildLegendItem('Semantic', const Color(0xFF4DD0E1)),
-              _buildLegendItem('Verbal', const Color(0xFF4FC3F7)),
-            ],
+          const SizedBox(height: 12),
+          _buildCategoryBar(
+            'Semantic',
+            widget.categoryLevels['semantic'] ?? 0,
+            const Color(0xFF4DD0E1),
+          ),
+          const SizedBox(height: 12),
+          _buildCategoryBar(
+            'Verbal',
+            widget.categoryLevels['verbal'] ?? 0,
+            const Color(0xFF4FC3F7),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
+  Widget _buildCategoryBar(String label, double value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.black54,
-          ),
+        Row(
+          children: [
+            SizedBox(
+              width: 100,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: value / 100,
+                            backgroundColor: color.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                            minHeight: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${value.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -440,180 +477,173 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Table(
-            border: TableBorder.all(
-              color: Colors.grey.withOpacity(0.3),
-              width: 1,
-            ),
-            columnWidths: const {
-              0: FlexColumnWidth(2),
-              1: FlexColumnWidth(1.5),
-              2: FlexColumnWidth(1.5),
-              3: FlexColumnWidth(1.5),
-            },
-            children: [
-              const TableRow(
-                decoration: BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                ),
-                children: [
-                  TableCell(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text(
-                        'Difficulty Level',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  TableCell(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text(
-                        'Procedural',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  TableCell(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text(
-                        'Semantic',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  TableCell(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text(
-                        'Verbal',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              ...['EASY', 'MEDIUM', 'HARD'].map((difficulty) {
-                return TableRow(
-                  children: [
-                    TableCell(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          difficulty.toLowerCase().capitalize(),
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ),
-                    _buildDetailedTableCell('PROCEDURAL', difficulty),
-                    _buildDetailedTableCell('SEMANTIC', difficulty),
-                    _buildDetailedTableCell('VERBAL', difficulty),
-                  ],
-                );
-              }).toList(),
-            ],
-          ),
+          _buildCategoryAnalysis('Procedural'),
+          const SizedBox(height: 16),
+          _buildCategoryAnalysis('Semantic'),
+          const SizedBox(height: 16),
+          _buildCategoryAnalysis('Verbal'),
         ],
       ),
     );
   }
 
-  Widget _buildDetailedTableCell(String type, String difficulty) {
-    // Get counts for this type and difficulty
-    int totalQuestions = 0;
-    int correctAnswers = 0;
+  Widget _buildCategoryAnalysis(String category) {
+    final Map<String, int> questionCounts;
+    final Map<String, int> correctCounts;
+    final Color categoryColor;
 
-    if (type == 'PROCEDURAL') {
-      totalQuestions = widget.proceduralQuestionCounts[difficulty] ?? 0;
-      correctAnswers = widget.proceduralCorrectCounts[difficulty] ?? 0;
-    } else if (type == 'SEMANTIC') {
-      totalQuestions = widget.semanticQuestionCounts[difficulty] ?? 0;
-      correctAnswers = widget.semanticCorrectCounts[difficulty] ?? 0;
-    } else if (type == 'VERBAL') {
-      totalQuestions = widget.verbalQuestionCounts[difficulty] ?? 0;
-      correctAnswers = widget.verbalCorrectCounts[difficulty] ?? 0;
+    // Assign the corresponding counts based on category
+    switch (category.toUpperCase()) {
+      case 'PROCEDURAL':
+        questionCounts = widget.proceduralQuestionCounts;
+        correctCounts = widget.proceduralCorrectCounts;
+        categoryColor = const Color(0xFF9CCC65);
+        break;
+      case 'SEMANTIC':
+        questionCounts = widget.semanticQuestionCounts;
+        correctCounts = widget.semanticCorrectCounts;
+        categoryColor = const Color(0xFF4DD0E1);
+        break;
+      case 'VERBAL':
+        questionCounts = widget.verbalQuestionCounts;
+        correctCounts = widget.verbalCorrectCounts;
+        categoryColor = const Color(0xFF4FC3F7);
+        break;
+      default:
+        return const SizedBox();
     }
 
-    // Calculate percentage
-    double percentage =
-        totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0.0;
-    final color = _getPerformanceColor(percentage);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          category,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildDifficultyLevel('Easy', questionCounts, correctCounts, categoryColor),
+            const SizedBox(width: 12),
+            _buildDifficultyLevel('Medium', questionCounts, correctCounts, categoryColor),
+            const SizedBox(width: 12),
+            _buildDifficultyLevel('Hard', questionCounts, correctCounts, categoryColor),
+          ],
+        ),
+      ],
+    );
+  }
 
-    return TableCell(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
+  Widget _buildDifficultyLevel(
+    String difficulty, 
+    Map<String, int> questionCounts, 
+    Map<String, int> correctCounts,
+    Color color,
+  ) {
+    final totalQuestions = questionCounts[difficulty.toUpperCase()] ?? 0;
+    final correctAnswers = correctCounts[difficulty.toUpperCase()] ?? 0;
+    final percentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0.0;
+    final stars = (percentage / 20).round();
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Column(
           children: [
-            Text(
-              '$correctAnswers/$totalQuestions',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              textAlign: TextAlign.center,
+              child: Text(
+                difficulty,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color.withOpacity(0.8),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (index) {
+                return Icon(
+                  index < stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                  color: index < stars ? const Color(0xFFFFD700) : Colors.grey[400],
+                  size: 16,
+                ).animate(delay: (50 * index).ms).scale();
+              }),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$correctAnswers',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  Text(
+                    '/$totalQuestions',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 4),
             Text(
-              '${percentage.toStringAsFixed(1)}%',
+              '${percentage.toStringAsFixed(0)}%',
               style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
                 color: color,
-                fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTableCell(String type, String difficulty) {
-    double percentage = 0.0;
-
-    // Get counts for this type and difficulty
-    int totalQuestions = 0;
-    int correctAnswers = 0;
-
-    if (type == 'PROCEDURAL') {
-      if (widget.proceduralQuestionCounts.containsKey(difficulty)) {
-        totalQuestions = widget.proceduralQuestionCounts[difficulty] ?? 0;
-        correctAnswers = widget.proceduralCorrectCounts[difficulty] ?? 0;
-      }
-    } else if (type == 'SEMANTIC') {
-      if (widget.semanticQuestionCounts.containsKey(difficulty)) {
-        totalQuestions = widget.semanticQuestionCounts[difficulty] ?? 0;
-        correctAnswers = widget.semanticCorrectCounts[difficulty] ?? 0;
-      }
-    } else if (type == 'VERBAL') {
-      if (widget.verbalQuestionCounts.containsKey(difficulty)) {
-        totalQuestions = widget.verbalQuestionCounts[difficulty] ?? 0;
-        correctAnswers = widget.verbalCorrectCounts[difficulty] ?? 0;
-      }
-    }
-
-    // Calculate percentage
-    percentage =
-        totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0.0;
-
-    final color = _getPerformanceColor(percentage);
-
-    return TableCell(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Text(
-          '${percentage.toStringAsFixed(1)}%',
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
+    ).animate()
+      .fadeIn(delay: 200.ms)
+      .slideY(begin: 0.2, end: 0);
   }
 
   Map<String, Map<String, double>> _calculateAverages() {
@@ -643,14 +673,6 @@ class _PerformanceResultScreenState extends State<PerformanceResultScreen> {
     if (value >= 70) return const Color(0xFFFF9500);
     if (value >= 60) return const Color(0xFFFF3B30);
     return const Color(0xFFFF2D55);
-  }
-
-  String _getPerformanceMessage() {
-    if (widget.score >= 90) return 'Excellent!';
-    if (widget.score >= 80) return 'Great Job!';
-    if (widget.score >= 70) return 'Good Progress!';
-    if (widget.score >= 60) return 'Keep Going!';
-    return 'Room for Improvement';
   }
 
   String _getPerformanceDescription() {

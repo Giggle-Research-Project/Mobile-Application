@@ -112,11 +112,7 @@ class AuthWrapper extends ConsumerWidget {
         );
       },
       loading: () => const SplashScreen(),
-      error: (error, stack) => Scaffold(
-        body: Center(
-          child: Text('Error: $error'),
-        ),
-      ),
+      error: (error, _) => const LoginPage(initialError: 'Authentication failed. Please try again.'),
     );
   }
 }

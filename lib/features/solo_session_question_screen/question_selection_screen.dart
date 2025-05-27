@@ -7,6 +7,7 @@ import 'package:giggle/features/function%2004/solo_verbal_session.dart';
 import 'package:giggle/features/lessons/question_generate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui';
+import 'package:giggle/features/solo_session_question_screen/challenge_questions_screen.dart';
 
 class SoloQuestionSelectionScreen extends ConsumerStatefulWidget {
   final Map<String, String>? difficultyLevels;
@@ -30,21 +31,15 @@ class SoloQuestionSelectionScreen extends ConsumerStatefulWidget {
 class _SoloQuestionSelectionScreenState
     extends ConsumerState<SoloQuestionSelectionScreen>
     with SingleTickerProviderStateMixin {
-  List<Map<String, dynamic>> questions = [];
+  List<List<Map<String, dynamic>>> challengeQuestions = [[], [], []];
   bool isLoading = true;
+  bool isRefreshing = false;
 
-  // Track completion and lock status
+  // Track completion status
   Map<String, bool> completionStatus = {
     'questionOne': false,
     'questionTwo': false,
     'questionThree': false,
-  };
-
-  // Track user answers
-  Map<String, String> userAnswers = {
-    'questionOne': '',
-    'questionTwo': '',
-    'questionThree': '',
   };
 
   // Animation controller
@@ -54,15 +49,16 @@ class _SoloQuestionSelectionScreenState
   @override
   void initState() {
     super.initState();
+
+    // Initialize animation controller
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
-    _controller.forward();
 
-    _loadQuestionStatus();
-    _generateQuestions();
+    // Load questions and status
+    _loadQuestionStatusAndQuestions();
   }
 
   @override
@@ -71,12 +67,142 @@ class _SoloQuestionSelectionScreenState
     super.dispose();
   }
 
+  Future<void> _loadQuestionStatusAndQuestions() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    await _loadQuestionStatus();
+    
+    // Generate or load questions for each challenge
+    for (int challengeIndex = 0; challengeIndex < 3; challengeIndex++) {
+      final questionId = _getQuestionId(challengeIndex);
+      final questionDetailsCollection = FirebaseFirestore.instance
+          .collection('functionActivities')
+          .doc(widget.userId)
+          .collection(widget.courseName)
+          .doc(widget.dyscalculiaType)
+          .collection('solo_sessions')
+          .doc('progress')
+          .collection(questionId)
+          .doc('status')
+          .collection('questionDetails');
+
+      // Check if questions exist in Firestore
+      final existingQuestions = await questionDetailsCollection.get();
+      if (existingQuestions.docs.isEmpty) {
+        // Generate new questions if none exist
+        await _generateQuestionsForChallenge(challengeIndex);
+      } else {
+        // Load existing questions
+        List<Map<String, dynamic>> loadedQuestions = [];
+        for (var doc in existingQuestions.docs) {
+          loadedQuestions.add(doc.data());
+        }
+        setState(() {
+          challengeQuestions[challengeIndex] = loadedQuestions;
+        });
+      }
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+
+    _controller.forward();
+  }
+
+  Future<void> _generateQuestionsForChallenge(int challengeIndex) async {
+    String type = widget.dyscalculiaType.split(' ')[0].toUpperCase();
+    List<String> difficulties = ['EASY', 'MEDIUM', 'HARD'];
+    String difficulty = difficulties[challengeIndex];
+
+    List<Map<String, dynamic>> generatedQuestions = [];
+    while (generatedQuestions.length < 10) {
+      List<Map<String, dynamic>> batch = generatePersonalizedQuestions(
+        widget.courseName,
+        {
+          'procedural': difficulty,
+          'semantic': difficulty,
+          'verbal': difficulty,
+        },
+      );
+
+      List<Map<String, dynamic>> filteredBatch = batch
+          .where((q) =>
+              q['dyscalculia_type'] == type && q['difficulty'] == difficulty)
+          .toList();
+
+      generatedQuestions.addAll(filteredBatch);
+    }
+
+    // Take only 10 questions
+    generatedQuestions = generatedQuestions.take(10).toList();
+
+    // Store questions in Firestore
+    final questionId = _getQuestionId(challengeIndex);
+    final questionDetailsCollection = FirebaseFirestore.instance
+        .collection('functionActivities')
+        .doc(widget.userId)
+        .collection(widget.courseName)
+        .doc(widget.dyscalculiaType)
+        .collection('solo_sessions')
+        .doc('progress')
+        .collection(questionId)
+        .doc('status')
+        .collection('questionDetails');
+
+    for (int i = 0; i < generatedQuestions.length; i++) {
+      await questionDetailsCollection.doc('question-$i').set({
+        ...generatedQuestions[i],
+        'completed': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    setState(() {
+      challengeQuestions[challengeIndex] = generatedQuestions;
+    });
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      isRefreshing = true;
+    });
+
+    await _loadQuestionStatus();
+
+    setState(() {
+      isRefreshing = false;
+    });
+  }
+
+  Future<void> _loadQuestionStatus() async {
+    try {
+      for (String questionId in ['questionOne', 'questionTwo', 'questionThree']) {
+        final statusDoc = await FirebaseFirestore.instance
+            .collection('functionActivities')
+            .doc(widget.userId)
+            .collection(widget.courseName)
+            .doc(widget.dyscalculiaType)
+            .collection('solo_sessions')
+            .doc('progress')
+            .collection(questionId)
+            .doc('status')
+            .get();
+
+        setState(() {
+          completionStatus[questionId] =
+              statusDoc.exists && statusDoc.data()?['completed'] == true;
+        });
+      }
+    } catch (error) {
+      print('Error loading question status: $error');
+    }
+  }
+
   bool _isQuestionLocked(int index) {
     final String questionId = _getQuestionId(index);
-
-    print('Checking lock status for question $index');
-    print('Question ID: $questionId');
-    print('Completion status: ${completionStatus[questionId]}');
 
     if (completionStatus[questionId] == true) {
       return true;
@@ -85,188 +211,10 @@ class _SoloQuestionSelectionScreenState
     if (index == 0) return false;
     if (index == 1) return !(completionStatus['questionOne'] ?? false);
     if (index == 2) {
-      return !(completionStatus['questionTwo'] ?? false) ||
-          !(completionStatus['questionOne'] ?? false);
+      return !(completionStatus['questionOne'] ?? false) ||
+          !(completionStatus['questionTwo'] ?? false);
     }
     return true;
-  }
-
-  Future<void> _loadQuestionStatus() async {
-    try {
-      final questionOneSnapshot = await FirebaseFirestore.instance
-          .collection('functionActivities')
-          .doc(widget.userId)
-          .collection(widget.courseName)
-          .doc(widget.dyscalculiaType)
-          .collection('solo_sessions')
-          .doc('progress')
-          .collection('questionOne')
-          .doc('status')
-          .get();
-
-      final questionTwoSnapshot = await FirebaseFirestore.instance
-          .collection('functionActivities')
-          .doc(widget.userId)
-          .collection(widget.courseName)
-          .doc(widget.dyscalculiaType)
-          .collection('solo_sessions')
-          .doc('progress')
-          .collection('questionTwo')
-          .doc('status')
-          .get();
-
-      final questionThreeSnapshot = await FirebaseFirestore.instance
-          .collection('functionActivities')
-          .doc(widget.userId)
-          .collection(widget.courseName)
-          .doc(widget.dyscalculiaType)
-          .collection('solo_sessions')
-          .doc('progress')
-          .collection('questionThree')
-          .doc('status')
-          .get();
-
-      print(
-          'Question One Snapshot: ${questionOneSnapshot.exists}, Data: ${questionOneSnapshot.data()}');
-      print(
-          'Question Two Snapshot: ${questionTwoSnapshot.exists}, Data: ${questionTwoSnapshot.data()}');
-      print(
-          'Question Three Snapshot: ${questionThreeSnapshot.exists}, Data: ${questionThreeSnapshot.data()}');
-
-      setState(() {
-        completionStatus['questionOne'] = questionOneSnapshot.exists &&
-            questionOneSnapshot.data()?['completed'] == true;
-        completionStatus['questionTwo'] = questionTwoSnapshot.exists &&
-            questionTwoSnapshot.data()?['completed'] == true;
-        completionStatus['questionThree'] = questionThreeSnapshot.exists &&
-            questionThreeSnapshot.data()?['completed'] == true;
-
-        print('Updated Completion Status: $completionStatus');
-      });
-    } catch (error) {
-      print('Error loading question status: $error');
-    }
-  }
-
-  Future<void> _markQuestionCompleted(String questionId) async {
-    try {
-      print('Marking question completed: $questionId');
-      print('Current user ID: ${widget.userId}');
-      print('Current course name: ${widget.courseName}');
-      print('Current dyscalculia type: ${widget.dyscalculiaType}');
-
-      // Update local state
-      setState(() {
-        completionStatus[questionId] = true;
-        print(
-            'Local completion status updated: ${completionStatus[questionId]}');
-      });
-
-      // Create the progress document
-      await FirebaseFirestore.instance
-          .collection('functionActivities')
-          .doc(widget.userId)
-          .collection(widget.courseName)
-          .doc(widget.dyscalculiaType)
-          .collection('solo_sessions')
-          .doc('progress')
-          .set({
-        'lastUpdated': FieldValue.serverTimestamp(),
-        'completed': (completionStatus['questionOne'] ?? false) &&
-            (completionStatus['questionTwo'] ?? false) &&
-            (completionStatus['questionThree'] ?? false),
-      }, SetOptions(merge: true));
-
-      // Update specific question status
-      DocumentReference questionStatusRef = FirebaseFirestore.instance
-          .collection('functionActivities')
-          .doc(widget.userId)
-          .collection(widget.courseName)
-          .doc(widget.dyscalculiaType)
-          .collection('solo_sessions')
-          .doc('progress')
-          .collection(questionId)
-          .doc('status');
-
-      await questionStatusRef.set({
-        'completed': true,
-        'completedAt': FieldValue.serverTimestamp(),
-        'userAnswer': userAnswers[questionId],
-      });
-
-      print('Question status document created successfully');
-      print('Question status document ID: ${questionStatusRef.path}');
-
-      // Verify the document was created correctly
-      DocumentSnapshot verifySnapshot = await questionStatusRef.get();
-      print('Verification snapshot exists: ${verifySnapshot.exists}');
-      print('Verification snapshot data: ${verifySnapshot.data()}');
-
-      // If all questions are completed, mark the whole session as completed
-      if ((completionStatus['questionOne'] ?? false) &&
-          (completionStatus['questionTwo'] ?? false) &&
-          (completionStatus['questionThree'] ?? false)) {
-        await FirebaseFirestore.instance
-            .collection('functionActivities')
-            .doc(widget.userId)
-            .collection(widget.courseName)
-            .doc(widget.dyscalculiaType)
-            .collection('solo_sessions')
-            .doc('progress')
-            .set({
-          'completed': true,
-          'completedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
-    } catch (error) {
-      print('Error marking question completed: $error');
-    }
-  }
-
-  void _generateQuestions() {
-    setState(() {
-      isLoading = true;
-    });
-
-    String type = widget.dyscalculiaType.split(' ')[0].toUpperCase();
-    List<Map<String, dynamic>> generatedQuestions = [];
-
-    while (generatedQuestions.length < 3) {
-      List<Map<String, dynamic>> batch = generatePersonalizedQuestions(
-        widget.courseName,
-        widget.difficultyLevels,
-      );
-
-      List<Map<String, dynamic>> filteredBatch =
-          batch.where((q) => q['dyscalculia_type'] == type).toList();
-
-      for (var question in filteredBatch) {
-        print('Complete question object: $question');
-
-        generatedQuestions.add(question);
-
-        if (generatedQuestions.length >= 3) break;
-      }
-    }
-
-    questions = generatedQuestions.sublist(0, 3);
-
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  bool _isQuestionCompleted(int index) {
-    switch (index) {
-      case 0:
-        return completionStatus['questionOne'] ?? false;
-      case 1:
-        return completionStatus['questionTwo'] ?? false;
-      case 2:
-        return completionStatus['questionThree'] ?? false;
-      default:
-        return false;
-    }
   }
 
   String _getQuestionId(int index) {
@@ -282,54 +230,182 @@ class _SoloQuestionSelectionScreenState
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    print(widget.dyscalculiaType);
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
-      body: Stack(
-        children: [
-          const BackgroundPattern(),
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildSliverAppBar(context),
-              SliverToBoxAdapter(
-                child: isLoading
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.only(top: 100),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ...List.generate(
-                                questions.length,
-                                (index) =>
-                                    _buildQuestionCard(questions[index], index),
-                              ),
-                              const SizedBox(height: 20),
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
-            ],
-          ),
-        ],
+  void _navigateToQuestionScreen(int index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChallengeQuestionsScreen(
+          challengeId: (index + 1).toString(),
+          courseName: widget.courseName,
+          userId: widget.userId,
+          dyscalculiaType: widget.dyscalculiaType,
+          questions: challengeQuestions[index],
+          onQuestionCompleted: (questionIndex, isCorrect, timeElapsed) async {
+            try {
+              // Mark question as completed in questionOne/status
+              await FirebaseFirestore.instance
+                  .collection('functionActivities')
+                  .doc(widget.userId)
+                  .collection(widget.courseName)
+                  .doc(widget.dyscalculiaType)
+                  .collection('solo_sessions')
+                  .doc('progress')
+                  .collection('questionOne')
+                  .doc('status')
+                  .collection('questionDetails')
+                  .doc('question-$questionIndex')
+                  .update({
+                'completed': true,
+              });
+
+              // Check if all questions in the challenge are completed
+              final questionDetailsSnapshot = await FirebaseFirestore.instance
+                  .collection('functionActivities')
+                  .doc(widget.userId)
+                  .collection(widget.courseName)
+                  .doc(widget.dyscalculiaType)
+                  .collection('solo_sessions')
+                  .doc('progress')
+                  .collection(_getQuestionId(index))
+                  .doc('status')
+                  .collection('questionDetails')
+                  .get();
+
+              bool allCompleted = questionDetailsSnapshot.docs
+                  .every((doc) => doc.data()['completed'] == true);
+
+              if (allCompleted) {
+                // Update challenge status
+                await FirebaseFirestore.instance
+                    .collection('functionActivities')
+                    .doc(widget.userId)
+                    .collection(widget.courseName)
+                    .doc(widget.dyscalculiaType)
+                    .collection('solo_sessions')
+                    .doc('progress')
+                    .collection(_getQuestionId(index))
+                    .doc('status')
+                    .set({
+                  'completed': true,
+                  'completedAt': FieldValue.serverTimestamp(),
+                });
+
+                // Force refresh of completion status
+                setState(() {
+                  completionStatus[_getQuestionId(index)] = true;
+                });
+              }
+
+              // Refresh the UI to show updated status
+              await _refreshData();
+            } catch (error) {
+              print('Error updating completion status: $error');
+            }
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildQuestionCard(Map<String, dynamic> question, int index) {
+  TextStyle _getTextStyle({
+    required double fontSize,
+    required bool isLocked,
+    required bool isCompleted,
+    double opacity = 1.0,
+    FontWeight weight = FontWeight.normal,
+    double? height,
+  }) {
+    return TextStyle(
+      fontSize: fontSize,
+      fontWeight: weight,
+      height: height,
+      color: isLocked && !isCompleted
+          ? const Color(0xFF1D1D1F).withOpacity(opacity * 0.5)
+          : const Color(0xFF1D1D1F).withOpacity(opacity),
+    );
+  }
+
+  BoxDecoration _getCardDecoration({
+    required bool isLocked,
+    required bool isCompleted,
+    required Color accentColor,
+  }) {
+    return BoxDecoration(
+      color: isLocked ? Colors.white.withOpacity(0.6) : Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 12,
+          offset: const Offset(0, 6),
+        ),
+      ],
+      border: Border.all(
+        color: isLocked
+            ? Colors.grey.withOpacity(0.1)
+            : accentColor.withOpacity(0.2),
+        width: 1.5,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F4F8),
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: Stack(
+          children: [
+            const BackgroundPattern(),
+            CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                _buildSliverAppBar(context),
+                SliverToBoxAdapter(
+                  child: isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 100),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ...List.generate(
+                                  3,
+                                  (index) => _buildQuestionCard(index),
+                                ),
+                                const SizedBox(height: 20),
+                                if (isRefreshing)
+                                  const Center(
+                                    child: Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 20),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuestionCard(int index) {
     final bool isLocked = _isQuestionLocked(index);
-    final bool isCompleted = _isQuestionCompleted(index);
+    final bool isCompleted = completionStatus[_getQuestionId(index)] ?? false;
 
     final Color cardColor =
         isLocked ? Colors.white.withOpacity(0.6) : Colors.white;
@@ -342,22 +418,10 @@ class _SoloQuestionSelectionScreenState
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        border: Border.all(
-          color: isLocked
-              ? Colors.grey.withOpacity(0.1)
-              : accentColor.withOpacity(0.2),
-          width: 1.5,
-        ),
+      decoration: _getCardDecoration(
+        isLocked: isLocked,
+        isCompleted: isCompleted,
+        accentColor: accentColor,
       ),
       child: Material(
         color: Colors.transparent,
@@ -382,48 +446,10 @@ class _SoloQuestionSelectionScreenState
                     ),
                   );
                 }
-              : () {
-                  if (widget.dyscalculiaType == 'Semantic Dyscalculia') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SemanticSoloSessionScreen(
-                          index: index.toString(),
-                          courseName: widget.courseName,
-                          questions: [question],
-                        ),
-                      ),
-                    );
-                  } else if (widget.dyscalculiaType == 'Verbal Dyscalculia') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SoloVerbalSessionScreen(
-                          courseName: widget.courseName,
-                          questions: [question],
-                          dyscalculiaType: widget.dyscalculiaType,
-                          index: index.toString(),
-                        ),
-                      ),
-                    );
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProceduralSoloSession(
-                          courseName: widget.courseName,
-                          questions: [question],
-                          dyscalculiaType: widget.dyscalculiaType,
-                          index: index.toString(),
-                        ),
-                      ),
-                    );
-                  }
-                },
+              : () => _navigateToQuestionScreen(index),
           borderRadius: BorderRadius.circular(24),
           child: Stack(
             children: [
-              // Background gradient for visual interest (subtle)
               Positioned.fill(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
@@ -444,17 +470,14 @@ class _SoloQuestionSelectionScreenState
                   ),
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top row with icon and action button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Left side with challenge number
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
@@ -485,44 +508,31 @@ class _SoloQuestionSelectionScreenState
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 18),
-
-                    // Challenge title
                     Text(
-                      isCompleted
-                          ? 'Completed Challenge ${index + 1}'
-                          : isLocked
-                              ? 'Locked Challenge'
-                              : 'Challenge ${index + 1}',
-                      style: TextStyle(
+                      'Challenge ${index + 1}',
+                      style: _getTextStyle(
                         fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: isLocked && !isCompleted
-                            ? const Color(0xFF1D1D1F).withOpacity(0.5)
-                            : const Color(0xFF1D1D1F),
+                        isLocked: isLocked,
+                        isCompleted: isCompleted,
+                        weight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
-                    // Challenge description
                     Text(
                       isCompleted
                           ? 'You have successfully completed this challenge.'
                           : isLocked
                               ? 'Complete the previous ${index == 1 ? 'challenge' : 'challenges'} to unlock this challenge.'
                               : 'Tap to start the challenge and test your skills.',
-                      style: TextStyle(
+                      style: _getTextStyle(
                         fontSize: 16,
+                        isLocked: isLocked,
+                        isCompleted: isCompleted,
+                        opacity: 0.7,
                         height: 1.5,
-                        color: isLocked && !isCompleted
-                            ? const Color(0xFF1D1D1F).withOpacity(0.3)
-                            : const Color(0xFF1D1D1F).withOpacity(0.7),
                       ),
                     ),
-
-                    // Show completion message if completed
                     if (isCompleted) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -555,54 +565,12 @@ class _SoloQuestionSelectionScreenState
                         ),
                       ),
                     ],
-
-                    // Add a "Start Challenge" button for unlocked, uncompleted challenges
                     if (!isLocked && !isCompleted) ...[
                       const SizedBox(height: 16),
                       Align(
                         alignment: Alignment.centerRight,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (widget.dyscalculiaType ==
-                                'Semantic Dyscalculia') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      SemanticSoloSessionScreen(
-                                    index: index.toString(),
-                                    courseName: widget.courseName,
-                                    questions: [question],
-                                  ),
-                                ),
-                              );
-                            } else if (widget.dyscalculiaType ==
-                                'Verbal Dyscalculia') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => SoloVerbalSessionScreen(
-                                    courseName: widget.courseName,
-                                    questions: [question],
-                                    dyscalculiaType: widget.dyscalculiaType,
-                                    index: index.toString(),
-                                  ),
-                                ),
-                              );
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProceduralSoloSession(
-                                    courseName: widget.courseName,
-                                    questions: [question],
-                                    dyscalculiaType: widget.dyscalculiaType,
-                                    index: index.toString(),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                          onPressed: () => _navigateToQuestionScreen(index),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: accentColor,
                             padding: const EdgeInsets.symmetric(
@@ -676,26 +644,29 @@ class _SoloQuestionSelectionScreenState
                         ),
                       ),
                       const SizedBox(width: 15),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.courseName} Challenges',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D1D1F),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.courseName} Challenges',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1D1D1F),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Progress through challenges one by one',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF1D1D1F),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Complete 10 questions per challenge',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF1D1D1F),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),

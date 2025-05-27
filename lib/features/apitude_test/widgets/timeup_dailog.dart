@@ -118,7 +118,9 @@ class TimeUpDialog extends StatelessWidget {
                             semanticQuestionCounts: semanticQuestionCounts,
                             semanticCorrectCounts: semanticCorrectCounts,
                             verbalQuestionCounts: verbalQuestionCounts,
-                            verbalCorrectCounts: verbalCorrectCounts,
+                            verbalCorrectCounts: verbalCorrectCounts, 
+                            skillCorrectAnswers: 0, 
+                            skillTotalQuestions: 0,
                           )),
                 );
                 _submitTest();

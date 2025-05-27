@@ -19,4 +19,8 @@ enum Lesson {
 
 enum TestType { skillAssessment, parentQuestionnaire }
 
-enum TestScreenType { skillAssessment, parentQuestionnaire }
+enum TestScreenType {
+  skillAssessment,
+  parentQuestionnaire,
+  parentQuestionnaireSinhala
+}

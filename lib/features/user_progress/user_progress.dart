@@ -5,6 +5,8 @@ import 'package:giggle/core/providers/auth_provider.dart';
 import 'package:giggle/core/widgets/bg_pattern.dart';
 import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:giggle/features/function%2003/interactive_session.dart';
+import 'package:giggle/features/function%2004/verbal_interactive_session.dart';
 import 'package:giggle/features/solo_session_question_screen/question_selection_screen.dart';
 import 'package:giggle/features/teacher_selection/teacher_selection_screen.dart';
 import 'package:giggle/features/teaching_sessions/teaching_session.dart';
@@ -31,6 +33,9 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
+
+  // Track if the screen needs to be refreshed
+  bool _needsRefresh = true;
 
   // Track completion status for each path individually
   Map<String, bool> completionStatus = {
@@ -63,6 +68,23 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
     super.dispose();
   }
 
+  // Function to refresh all completion statuses
+  void refreshCompletionStatuses(String userId) {
+    if (mounted) {
+      setState(() {
+        loadingStatus = {
+          'video': true,
+          'interactive sessions': true,
+          'solo sessions': true,
+        };
+      });
+    }
+
+    _checkPathCompletionStatus('video', userId);
+    _checkPathCompletionStatus('interactive sessions', userId);
+    _checkPathCompletionStatus('solo sessions', userId);
+  }
+
   // Function to check status for a specific path type
   Future<void> _checkPathCompletionStatus(
       String pathType, String userId) async {
@@ -84,9 +106,11 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
       }
 
       if (collectionName.isEmpty) {
-        setState(() {
-          loadingStatus[pathType] = false;
-        });
+        if (mounted) {
+          setState(() {
+            loadingStatus[pathType] = false;
+          });
+        }
         return;
       }
 
@@ -99,28 +123,26 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
           .doc('progress')
           .get();
 
-      setState(() {
-        completionStatus[pathType] =
-            snapshot.exists && snapshot.data()?['completed'] == true;
-        loadingStatus[pathType] = false;
-      });
+      if (mounted) {
+        setState(() {
+          completionStatus[pathType] =
+              snapshot.exists && snapshot.data()?['completed'] == true;
+          loadingStatus[pathType] = false;
+        });
+      }
     } catch (error) {
       print('Error checking completion status for $pathType: $error');
-      setState(() {
-        loadingStatus[pathType] = false;
-      });
+      if (mounted) {
+        setState(() {
+          loadingStatus[pathType] = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-
-    print(widget.difficultyLevels);
-    print(widget.courseName);
-    print(widget.dyscalculiaType);
-
-    print(widget.questions);
 
     return authState.when(
       data: (AppUser? user) {
@@ -131,16 +153,13 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
           return const SizedBox.shrink();
         }
 
-        // Start loading each path's status independently
-        // Only initiate these checks if they haven't been started yet
-        if (loadingStatus['video'] == true) {
-          _checkPathCompletionStatus('video', user.uid);
-        }
-        if (loadingStatus['interactive sessions'] == true) {
-          _checkPathCompletionStatus('interactive sessions', user.uid);
-        }
-        if (loadingStatus['solo sessions'] == true) {
-          _checkPathCompletionStatus('solo sessions', user.uid);
+        // Only load data if it's the first build or if we need a refresh
+        if (_needsRefresh) {
+          // Reset the flag
+          _needsRefresh = false;
+
+          // Start the refresh process
+          refreshCompletionStatuses(user.uid);
         }
 
         return WillPopScope(
@@ -153,27 +172,42 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
             body: Stack(
               children: [
                 const BackgroundPattern(),
-                CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    _buildSliverAppBar(context),
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 20),
-                              _buildLearningPaths(user.uid),
-                              const SizedBox(height: 20),
-                            ],
+                RefreshIndicator(
+                  onRefresh: () async {
+                    // Set loading states to true before refreshing
+                    setState(() {
+                      loadingStatus = {
+                        'video': true,
+                        'interactive sessions': true,
+                        'solo sessions': true,
+                      };
+                    });
+
+                    // Refresh all data
+                    refreshCompletionStatuses(user.uid);
+                  },
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      _buildSliverAppBar(context),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 20),
+                                _buildLearningPaths(user.uid),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -209,6 +243,7 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
         'icon': Icons.people_alt_rounded,
         'color': const Color(0xFF2979FF),
         'type': 'interactive sessions',
+        // 'isLocked': !(completionStatus['video'] ?? false),
         'isLocked': false,
         'isCompleted': completionStatus['interactive sessions'] ?? false,
         'isLoading': loadingStatus['interactive sessions'] ?? true,
@@ -220,8 +255,8 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
         'icon': Icons.psychology_rounded,
         'color': const Color(0xFFFF6D00),
         'type': 'solo sessions',
-        'isLocked': !(completionStatus['interactive sessions'] ?? false) ||
-            (completionStatus['solo sessions'] ?? false),
+        // 'isLocked': !(completionStatus['interactive sessions'] ?? false),
+        'isLocked': false,
         'isCompleted': completionStatus['solo sessions'] ?? false,
         'isLoading': loadingStatus['solo sessions'] ?? true,
       },
@@ -299,14 +334,14 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
                     ),
                   );
                 }
-              : () {
+              : () async {
                   final String pathType = path['type'] as String;
 
                   // Navigate to different screens based on path type
                   switch (pathType) {
                     case 'video':
                       // Navigate to video learning screen
-                      Navigator.push(
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => TeachingSessionScreen(
@@ -321,24 +356,76 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
                           ),
                         ),
                       );
+
+                      // Refresh data when returning from the video screen
+                      if (result == true || result == null) {
+                        _needsRefresh = true;
+                        if (mounted) setState(() {});
+                      }
                       break;
                     case 'interactive sessions':
                       // Navigate to interactive sessions screen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TeacherSelectionScreen(
-                            courseName: widget.courseName,
-                            dyscalculiaType: widget.dyscalculiaType,
-                            questions: widget.questions,
-                            userId: userId,
+                      if (widget.dyscalculiaType == "Verbal Dyscalculia") {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VerbalInteractiveSessionScreen(
+                              difficultyLevels: widget.difficultyLevels,
+                              dyscalculiaType: widget.dyscalculiaType,
+                              questions: widget.questions,
+                              courseName: widget.courseName,
+                              userId: userId,
+                            ),
                           ),
-                        ),
-                      );
+                        );
+
+                        // Refresh data when returning
+                        if (result == true || result == null) {
+                          _needsRefresh = true;
+                          if (mounted) setState(() {});
+                        }
+                      } else if (widget.dyscalculiaType == "Procedural Dyscalculia") {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProceduralInteractiveSession(
+                              difficultyLevels: widget.difficultyLevels,
+                              dyscalculiaType: widget.dyscalculiaType,
+                              courseName: widget.courseName,
+                              questions: widget.questions,
+                              userId: userId,
+                            ),
+                          ),
+                        );
+
+                        // Refresh data when returning
+                        if (result == true || result == null) {
+                          _needsRefresh = true;
+                          if (mounted) setState(() {});
+                        }
+                      } else {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TeacherSelectionScreen(
+                              courseName: widget.courseName,
+                              dyscalculiaType: widget.dyscalculiaType,
+                              questions: widget.questions,
+                              userId: userId,
+                            ),
+                          ),
+                        );
+
+                        // Refresh data when returning
+                        if (result == true || result == null) {
+                          _needsRefresh = true;
+                          if (mounted) setState(() {});
+                        }
+                      }
                       break;
                     case 'solo sessions':
                       // Navigate to solo practice screen
-                      Navigator.push(
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => SoloQuestionSelectionScreen(
@@ -349,10 +436,16 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
                           ),
                         ),
                       );
+
+                      // Refresh data when returning
+                      if (result == true || result == null) {
+                        _needsRefresh = true;
+                        if (mounted) setState(() {});
+                      }
                       break;
                     default:
                       // Default fallback to teaching session
-                      Navigator.push(
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => TeachingSessionScreen(
@@ -367,6 +460,12 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
                           ),
                         ),
                       );
+
+                      // Refresh data when returning
+                      if (result == true || result == null) {
+                        _needsRefresh = true;
+                        if (mounted) setState(() {});
+                      }
                   }
                 },
           borderRadius: BorderRadius.circular(24),
@@ -581,26 +680,64 @@ class _UserProgressScreenState extends ConsumerState<UserProgressScreen>
                         ),
                       ),
                       const SizedBox(width: 15),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${widget.courseName} Lessons',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D1D1F),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${widget.courseName} Lessons',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1D1D1F),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Complete each path in sequence',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF1D1D1F),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Complete each path in sequence',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF1D1D1F),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      // Add a refresh button
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () {
+                          // Get current user ID
+                          final userId = ref.read(authProvider).maybeWhen(
+                                data: (user) => user?.uid,
+                                orElse: () => null,
+                              );
+
+                          if (userId != null) {
+                            // Show loading indicator
+                            setState(() {
+                              loadingStatus = {
+                                'video': true,
+                                'interactive sessions': true,
+                                'solo sessions': true,
+                              };
+                            });
+
+                            // Refresh data
+                            refreshCompletionStatuses(userId);
+
+                            // Show a snackbar
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Refreshing data...'),
+                                duration: Duration(seconds: 1),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),
